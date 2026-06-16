@@ -3,6 +3,35 @@ import { getTopologicalOrder, hasCycle } from '../utils/graphUtils';
 import { callLLM } from './api';
 import { Node, TraceStep } from '../types';
 
+function getWordFrequency(text: string): Map<string, number> {
+  const words = text.toLowerCase().match(/\b\w+\b/g) || [];
+  const freq = new Map<string, number>();
+  for (const w of words) {
+    freq.set(w, (freq.get(w) || 0) + 1);
+  }
+  return freq;
+}
+
+function calculateCosineSimilarity(freq1: Map<string, number>, freq2: Map<string, number>): number {
+  let dotProduct = 0;
+  let norm1 = 0;
+  let norm2 = 0;
+
+  for (const [word, count] of freq1.entries()) {
+    norm1 += count * count;
+    if (freq2.has(word)) {
+      dotProduct += count * (freq2.get(word) || 0);
+    }
+  }
+
+  for (const count of freq2.values()) {
+    norm2 += count * count;
+  }
+
+  if (norm1 === 0 || norm2 === 0) return 0;
+  return dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2));
+}
+
 export interface ExecutionOptions {
   timeoutMs?: number;
   fallback?: boolean;
@@ -161,6 +190,83 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
             } else {
               nodeOutput = 'Default Route';
             }
+            break;
+          }
+
+          case 'VectorDB': {
+            const queryStr = typeof incomingInput === 'string'
+              ? incomingInput
+              : incomingInput !== null && incomingInput !== undefined
+                ? JSON.stringify(incomingInput)
+                : '';
+
+            nodeInput = queryStr;
+            const model = node.data.embeddingModel || 'default';
+            const docs = (node.data.documents || '')
+              .split('\n')
+              .map(d => d.trim())
+              .filter(Boolean);
+
+            const threshold = node.data.similarityThreshold !== undefined
+              ? node.data.similarityThreshold
+              : 0;
+
+            log = `Running VectorDB query on ${docs.length} documents using model: ${model} with threshold ${threshold}`;
+
+            const queryFreq = getWordFrequency(queryStr);
+            const matches = docs
+              .map(doc => {
+                const docFreq = getWordFrequency(doc);
+                const similarity = calculateCosineSimilarity(queryFreq, docFreq);
+                return { doc, similarity };
+              })
+              .filter(item => item.similarity >= threshold)
+              .sort((a, b) => b.similarity - a.similarity)
+              .map(item => item.doc);
+
+            nodeOutput = matches;
+            log += `. Found ${matches.length} matching documents.`;
+            break;
+          }
+
+          case 'JSONPath': {
+            let parsedInput: any = incomingInput;
+            if (typeof incomingInput === 'string') {
+              try {
+                parsedInput = JSON.parse(incomingInput);
+              } catch (e) {
+                // Keep as is
+              }
+            }
+
+            const rawPath = node.data.jsonPath || '';
+            const path = rawPath.replace(/^\$/, '');
+            const cleanPath = path
+              .replace(/\[\s*['"]?([^'"]+?)['"]?\s*\]/g, '.$1')
+              .replace(/^\./, '');
+
+            log = `Extracting path '${rawPath}' from input`;
+
+            let current = parsedInput;
+            if (cleanPath) {
+              const keys = cleanPath.split('.').filter(Boolean);
+              for (const key of keys) {
+                if (current === null || current === undefined) {
+                  current = undefined;
+                  break;
+                }
+                if (Array.isArray(current)) {
+                  const idx = parseInt(key, 10);
+                  if (!isNaN(idx)) {
+                    current = current[idx];
+                    continue;
+                  }
+                }
+                current = current[key];
+              }
+            }
+
+            nodeOutput = current;
             break;
           }
 

@@ -8,7 +8,7 @@ export const Sidebar: React.FC = () => {
   const [importJson, setImportJson] = React.useState('');
   const [serializedJson, setSerializedJson] = React.useState('');
 
-  const nodeTypes: NodeType[] = ['LLM', 'Prompt', 'Tool', 'Router', 'Output'];
+  const nodeTypes: NodeType[] = ['LLM', 'Prompt', 'Tool', 'Router', 'Output', 'VectorDB', 'JSONPath'];
 
   const handleAddNode = (type: NodeType) => {
     const offset = nodes.length * 40;

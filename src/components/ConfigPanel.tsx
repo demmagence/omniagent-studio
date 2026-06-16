@@ -174,6 +174,64 @@ export const ConfigPanel: React.FC = () => {
           This node gathers the execution results of upstream nodes and outputs them.
         </div>
       )}
+
+      {selectedNode.type === 'VectorDB' && (
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '12px', color: '#9ca3af' }}>Embedding Model</label>
+            <input
+              data-testid="config-embedding-model-input"
+              type="text"
+              value={data.embeddingModel || ''}
+              onChange={(e) => handleChange('embeddingModel', e.target.value)}
+              placeholder="e.g. text-embedding-3-small"
+              style={{ backgroundColor: '#111827', color: 'white', border: '1px solid #4b5563', borderRadius: '4px', padding: '6px', fontSize: '13px' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '12px', color: '#9ca3af' }}>Mock Index Documents</label>
+            <textarea
+              data-testid="config-documents-input"
+              value={data.documents || ''}
+              onChange={(e) => handleChange('documents', e.target.value)}
+              rows={4}
+              placeholder="Enter documents, one per line"
+              style={{ backgroundColor: '#111827', color: 'white', border: '1px solid #4b5563', borderRadius: '4px', padding: '6px', fontSize: '13px' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '12px', color: '#9ca3af' }}>Similarity Threshold</label>
+            <input
+              data-testid="config-similarity-threshold-input"
+              type="number"
+              step="0.01"
+              value={data.similarityThreshold !== undefined ? data.similarityThreshold : ''}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                graphStore.updateNodeData(selectedNode.id, { similarityThreshold: isNaN(val) ? undefined : val });
+              }}
+              placeholder="e.g. 0.5"
+              style={{ backgroundColor: '#111827', color: 'white', border: '1px solid #4b5563', borderRadius: '4px', padding: '6px', fontSize: '13px' }}
+            />
+          </div>
+        </>
+      )}
+
+      {selectedNode.type === 'JSONPath' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label style={{ fontSize: '12px', color: '#9ca3af' }}>JSON Key Path</label>
+          <input
+            data-testid="config-jsonpath-input"
+            type="text"
+            value={data.jsonPath || ''}
+            onChange={(e) => handleChange('jsonPath', e.target.value)}
+            placeholder="e.g. data.users[0].name"
+            style={{ backgroundColor: '#111827', color: 'white', border: '1px solid #4b5563', borderRadius: '4px', padding: '6px', fontSize: '13px' }}
+          />
+        </div>
+      )}
     </div>
   );
 };

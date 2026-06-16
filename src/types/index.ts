@@ -1,4 +1,4 @@
-export type NodeType = 'LLM' | 'Prompt' | 'Tool' | 'Router' | 'Output';
+export type NodeType = 'LLM' | 'Prompt' | 'Tool' | 'Router' | 'Output' | 'VectorDB' | 'JSONPath';
 
 export interface NodeData {
   label: string;
@@ -12,6 +12,10 @@ export interface NodeData {
   toolName?: string;
   routingRules?: string; // Logic for router nodes
   outputVal?: string;
+  embeddingModel?: string;
+  documents?: string;
+  similarityThreshold?: number;
+  jsonPath?: string;
 }
 
 export interface Node {
