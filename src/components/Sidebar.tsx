@@ -11,7 +11,8 @@ export const Sidebar: React.FC = () => {
   const nodeTypes: NodeType[] = ['LLM', 'Prompt', 'Tool', 'Router', 'Output'];
 
   const handleAddNode = (type: NodeType) => {
-    graphStore.addNode(type);
+    const offset = nodes.length * 40;
+    graphStore.addNode(type, { x: 100 + offset, y: 100 + offset });
   };
 
   const handleExport = () => {

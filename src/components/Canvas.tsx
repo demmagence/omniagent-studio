@@ -1,48 +1,350 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useGraphStore, graphStore } from '../store/graphStore';
 import { Node } from './Node';
 
 export const Canvas: React.FC = () => {
   const { nodes, edges, selectedNodeId } = useGraphStore();
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [activeConnection, setActiveConnection] = useState<{
+    nodeId: string;
+    portType: 'in' | 'out';
+    currentX: number;
+    currentY: number;
+  } | null>(null);
 
-  const handleCanvasClick = () => {
-    graphStore.selectNode(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const zoomRef = useRef(zoom);
+  const panRef = useRef(pan);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+    panRef.current = pan;
+  }, [zoom, pan]);
+
+  useEffect(() => {
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+
+    const handleWheelNative = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = canvasEl.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const zoomFactor = 1.05;
+      const nextZoom = e.deltaY < 0 
+        ? Math.min(3, zoomRef.current * zoomFactor)
+        : Math.max(0.1, zoomRef.current / zoomFactor);
+
+      const dx = mouseX - panRef.current.x;
+      const dy = mouseY - panRef.current.y;
+      const scaleChange = nextZoom / zoomRef.current;
+
+      setPan({
+        x: mouseX - dx * scaleChange,
+        y: mouseY - dy * scaleChange
+      });
+      setZoom(nextZoom);
+    };
+
+    canvasEl.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => {
+      canvasEl.removeEventListener('wheel', handleWheelNative);
+    };
+  }, []);
+
+  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('[data-testid^="node-item-"]') ||
+      target.closest('button') ||
+      target.closest('select') ||
+      target.closest('.port-input') ||
+      target.closest('.port-output')
+    ) {
+      return;
+    }
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initPanX = panRef.current.x;
+    const initPanY = panRef.current.y;
+    let hasMoved = false;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+        hasMoved = true;
+      }
+      setPan({ x: initPanX + dx, y: initPanY + dy });
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      
+      if (!hasMoved) {
+        graphStore.selectNode(null);
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const startDragNode = (nodeId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    graphStore.selectNode(nodeId);
+
+    const target = e.target as HTMLElement;
+    if (
+      target.tagName === 'INPUT' ||
+      target.tagName === 'SELECT' ||
+      target.tagName === 'BUTTON' ||
+      target.tagName === 'OPTION' ||
+      target.closest('.port-input') ||
+      target.closest('.port-output')
+    ) {
+      return;
+    }
+
+    const initialMouseX = e.clientX;
+    const initialMouseY = e.clientY;
+    const targetNode = nodes.find(n => n.id === nodeId);
+    if (!targetNode) return;
+    const initialNodeX = targetNode.position.x;
+    const initialNodeY = targetNode.position.y;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const z = zoomRef.current;
+      const dx = (moveEvent.clientX - initialMouseX) / z;
+      const dy = (moveEvent.clientY - initialMouseY) / z;
+      graphStore.updateNodePosition(nodeId, {
+        x: initialNodeX + dx,
+        y: initialNodeY + dy,
+      });
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const startConnect = (nodeId: string, portType: 'in' | 'out', e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+    const rect = canvasEl.getBoundingClientRect();
+    
+    const z = zoomRef.current;
+    const p = panRef.current;
+    
+    const initX = (e.clientX - rect.left - p.x) / z;
+    const initY = (e.clientY - rect.top - p.y) / z;
+
+    setActiveConnection({
+      nodeId,
+      portType,
+      currentX: initX,
+      currentY: initY,
+    });
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const canvasElLatest = canvasRef.current;
+      if (!canvasElLatest) return;
+      const r = canvasElLatest.getBoundingClientRect();
+      const zLatest = zoomRef.current;
+      const pLatest = panRef.current;
+      
+      const currX = (moveEvent.clientX - r.left - pLatest.x) / zLatest;
+      const currY = (moveEvent.clientY - r.top - pLatest.y) / zLatest;
+      
+      setActiveConnection({
+        nodeId,
+        portType,
+        currentX: currX,
+        currentY: currY,
+      });
+    };
+
+    const handleMouseUp = (upEvent: MouseEvent) => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+
+      const element = document.elementFromPoint(upEvent.clientX, upEvent.clientY) as HTMLElement | null;
+      const portElement = element?.closest('[data-port-node-id]');
+      if (portElement) {
+        const targetNodeId = portElement.getAttribute('data-port-node-id');
+        const targetPortType = portElement.getAttribute('data-port-type');
+        if (targetNodeId && targetPortType && targetNodeId !== nodeId) {
+          if (portType === 'out' && targetPortType === 'in') {
+            graphStore.addEdge(nodeId, targetNodeId);
+          } else if (portType === 'in' && targetPortType === 'out') {
+            graphStore.addEdge(targetNodeId, nodeId);
+          }
+        }
+      }
+      setActiveConnection(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const getBezierPath = (x1: number, y1: number, x2: number, y2: number) => {
+    const dx = Math.abs(x2 - x1);
+    const cx1 = x1 + Math.max(50, dx / 2);
+    const cy1 = y1;
+    const cx2 = x2 - Math.max(50, dx / 2);
+    const cy2 = y2;
+    return `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
   };
 
   const handleRemoveEdge = (edgeId: string) => {
     graphStore.removeEdge(edgeId);
   };
 
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.getAttribute('data-testid') === 'canvas') {
+      graphStore.selectNode(null);
+    }
+  };
+
   return (
     <div
+      ref={canvasRef}
       data-testid="canvas"
+      onMouseDown={handleCanvasMouseDown}
       onClick={handleCanvasClick}
       style={{
         flex: 1,
         backgroundColor: '#111827',
         position: 'relative',
-        overflow: 'auto',
-        padding: '16px',
+        overflow: 'hidden',
+        minHeight: '500px',
+        border: '1px dashed #374151',
         display: 'flex',
         flexDirection: 'column',
-        minHeight: '400px',
-        border: '1px dashed #374151'
+        userSelect: 'none'
       }}
     >
-      <h3 style={{ color: '#f3f4f6', margin: '0 0 12px 0' }}>Workspace Canvas</h3>
-      
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+      <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 10, pointerEvents: 'none' }}>
+        <h3 style={{ color: '#f3f4f6', margin: 0 }}>Workspace Canvas</h3>
+        <p style={{ color: '#9ca3af', margin: '4px 0 0 0', fontSize: '11px' }}>
+          Drag Canvas to Pan. Scroll Wheel to Zoom ({Math.round(zoom * 100)}%). Drag ports to Connect.
+        </p>
+      </div>
+
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transformOrigin: '0 0',
+          pointerEvents: 'none'
+        }}
+      >
+        <svg
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            overflow: 'visible',
+            pointerEvents: 'none'
+          }}
+        >
+          {edges.map((edge) => {
+            const srcNode = nodes.find(n => n.id === edge.source);
+            const tgtNode = nodes.find(n => n.id === edge.target);
+            if (!srcNode || !tgtNode) return null;
+
+            const x1 = srcNode.position.x + 200;
+            const y1 = srcNode.position.y + 60;
+            const x2 = tgtNode.position.x;
+            const y2 = tgtNode.position.y + 60;
+
+            return (
+              <path
+                key={edge.id}
+                d={getBezierPath(x1, y1, x2, y2)}
+                fill="none"
+                stroke="#10b981"
+                strokeWidth={3}
+              />
+            );
+          })}
+
+          {activeConnection && (() => {
+            const srcNode = nodes.find(n => n.id === activeConnection.nodeId);
+            if (!srcNode) return null;
+
+            let x1, y1, x2, y2;
+            if (activeConnection.portType === 'out') {
+              x1 = srcNode.position.x + 200;
+              y1 = srcNode.position.y + 60;
+              x2 = activeConnection.currentX;
+              y2 = activeConnection.currentY;
+            } else {
+              x1 = activeConnection.currentX;
+              y1 = activeConnection.currentY;
+              x2 = srcNode.position.x;
+              y2 = srcNode.position.y + 60;
+            }
+
+            return (
+              <path
+                d={getBezierPath(x1, y1, x2, y2)}
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth={3}
+                strokeDasharray="4 4"
+              />
+            );
+          })()}
+        </svg>
+
         {nodes.map((node) => (
           <Node
             key={node.id}
             node={node}
             isSelected={node.id === selectedNodeId}
             allNodes={nodes}
+            onStartDrag={startDragNode}
+            onPortMouseDown={startConnect}
           />
         ))}
       </div>
 
-      <div style={{ marginTop: '24px', borderTop: '1px solid #374151', paddingTop: '16px' }}>
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '16px',
+          left: '16px',
+          right: '16px',
+          zIndex: 10,
+          backgroundColor: 'rgba(31, 41, 55, 0.95)',
+          padding: '12px',
+          borderRadius: '8px',
+          border: '1px solid #374151',
+          maxHeight: '150px',
+          overflowY: 'auto'
+        }}
+      >
         <h4 style={{ color: '#9ca3af', margin: '0 0 8px 0' }}>Connections (Edges)</h4>
         {edges.length === 0 ? (
           <p style={{ color: '#6b7280', fontSize: '12px' }}>No connections yet.</p>
@@ -61,7 +363,7 @@ export const Canvas: React.FC = () => {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    backgroundColor: '#1f2937',
+                    backgroundColor: '#111827',
                     padding: '4px 8px',
                     borderRadius: '4px',
                     marginBottom: '4px',
@@ -89,3 +391,4 @@ export const Canvas: React.FC = () => {
     </div>
   );
 };
+

@@ -74,6 +74,16 @@ class GraphStore {
     this.emit();
   }
 
+  updateNodePosition(nodeId: string, position: { x: number; y: number }) {
+    this.state.nodes = this.state.nodes.map((n) => {
+      if (n.id === nodeId) {
+        return { ...n, position };
+      }
+      return n;
+    });
+    this.emit();
+  }
+
   selectNode(nodeId: string | null) {
     this.state.selectedNodeId = nodeId;
     this.emit();
