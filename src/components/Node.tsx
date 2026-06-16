@@ -1,6 +1,6 @@
 import React from 'react';
 import { Node as NodeType } from '../types';
-import { graphStore } from '../store/graphStore';
+import { graphStore, useGraphStore } from '../store/graphStore';
 
 interface NodeProps {
   node: NodeType;
@@ -17,7 +17,12 @@ export const Node: React.FC<NodeProps> = ({
   onStartDrag,
   onPortMouseDown
 }) => {
+  const { selectedRunId, traceSteps } = useGraphStore();
+  const isReplayMode = selectedRunId !== null;
   const [targetId, setTargetId] = React.useState('');
+
+  const nodeTrace = traceSteps.find((s) => s.nodeId === node.id);
+  const nodeStatus = nodeTrace ? nodeTrace.status : null;
 
   const handleSelect = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -26,10 +31,12 @@ export const Node: React.FC<NodeProps> = ({
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isReplayMode) return;
     graphStore.removeNode(node.id);
   };
 
   const handleConnect = () => {
+    if (isReplayMode) return;
     if (targetId) {
       graphStore.addEdge(node.id, targetId);
       setTargetId('');
@@ -50,12 +57,29 @@ export const Node: React.FC<NodeProps> = ({
         top: `${node.position.y}px`,
         width: '200px',
         height: '120px',
-        border: isSelected ? '2px solid #3b82f6' : '1px solid #4b5563',
+        border:
+          nodeStatus === 'running'
+            ? '2px solid #f59e0b'
+            : nodeStatus === 'completed'
+            ? '2px solid #10b981'
+            : nodeStatus === 'failed'
+            ? '2px solid #ef4444'
+            : isSelected
+            ? '2px solid #3b82f6'
+            : '1px solid #4b5563',
+        boxShadow:
+          nodeStatus === 'running'
+            ? '0 0 10px #f59e0b'
+            : nodeStatus === 'completed'
+            ? '0 0 10px #10b981'
+            : nodeStatus === 'failed'
+            ? '0 0 10px #ef4444'
+            : 'none',
         padding: '12px',
         borderRadius: '8px',
         backgroundColor: '#1f2937',
         color: '#f3f4f6',
-        cursor: 'move',
+        cursor: isReplayMode ? 'default' : 'move',
         boxSizing: 'border-box',
         zIndex: isSelected ? 5 : 2,
         pointerEvents: 'auto'
@@ -67,7 +91,10 @@ export const Node: React.FC<NodeProps> = ({
         data-port-node-id={node.id}
         data-port-type="in"
         className="port-input"
-        onMouseDown={(e) => onPortMouseDown?.(node.id, 'in', e)}
+        onMouseDown={(e) => {
+          if (isReplayMode) return;
+          onPortMouseDown?.(node.id, 'in', e);
+        }}
         style={{
           position: 'absolute',
           left: '-8px',
@@ -76,10 +103,11 @@ export const Node: React.FC<NodeProps> = ({
           width: '16px',
           height: '16px',
           borderRadius: '50%',
-          backgroundColor: '#3b82f6',
+          backgroundColor: isReplayMode ? '#4b5563' : '#3b82f6',
           border: '3px solid #111827',
-          cursor: 'crosshair',
-          zIndex: 10
+          cursor: isReplayMode ? 'not-allowed' : 'crosshair',
+          zIndex: 10,
+          opacity: isReplayMode ? 0.5 : 1
         }}
         title="Input Port (Drag to connect)"
       />
@@ -90,7 +118,10 @@ export const Node: React.FC<NodeProps> = ({
         data-port-node-id={node.id}
         data-port-type="out"
         className="port-output"
-        onMouseDown={(e) => onPortMouseDown?.(node.id, 'out', e)}
+        onMouseDown={(e) => {
+          if (isReplayMode) return;
+          onPortMouseDown?.(node.id, 'out', e);
+        }}
         style={{
           position: 'absolute',
           right: '-8px',
@@ -99,10 +130,11 @@ export const Node: React.FC<NodeProps> = ({
           width: '16px',
           height: '16px',
           borderRadius: '50%',
-          backgroundColor: '#10b981',
+          backgroundColor: isReplayMode ? '#4b5563' : '#10b981',
           border: '3px solid #111827',
-          cursor: 'crosshair',
-          zIndex: 10
+          cursor: isReplayMode ? 'not-allowed' : 'crosshair',
+          zIndex: 10,
+          opacity: isReplayMode ? 0.5 : 1
         }}
         title="Output Port (Drag to connect)"
       />
@@ -112,17 +144,19 @@ export const Node: React.FC<NodeProps> = ({
           {labelText}
         </span>
         <button
+          disabled={isReplayMode}
           onClick={handleDelete}
           data-testid={`delete-node-${node.id}`}
           style={{
-            background: '#ef4444',
-            color: 'white',
+            background: isReplayMode ? '#4b5563' : '#ef4444',
+            color: isReplayMode ? '#9ca3af' : 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: 'pointer',
+            cursor: isReplayMode ? 'not-allowed' : 'pointer',
             fontSize: '10px',
             padding: '2px 6px',
-            zIndex: 11
+            zIndex: 11,
+            opacity: isReplayMode ? 0.6 : 1
           }}
         >
           X
@@ -130,18 +164,40 @@ export const Node: React.FC<NodeProps> = ({
       </div>
       <div style={{ fontSize: '12px', color: '#9ca3af', userSelect: 'none' }}>Type: {node.type}</div>
       
+      <div
+        data-testid={`node-status-${node.id}`}
+        style={{
+          marginTop: '4px',
+          fontSize: '10px',
+          fontWeight: 'bold',
+          color:
+            nodeStatus === 'completed'
+              ? '#10b981'
+              : nodeStatus === 'failed'
+              ? '#ef4444'
+              : nodeStatus === 'running'
+              ? '#f59e0b'
+              : '#9ca3af',
+          textTransform: 'uppercase'
+        }}
+      >
+        {nodeStatus || 'pending'}
+      </div>
+
       <div style={{ marginTop: '12px', display: 'flex', gap: '4px' }}>
         <select
+          disabled={isReplayMode}
           value={targetId}
           onChange={(e) => setTargetId(e.target.value)}
           data-testid={`connect-select-${node.id}`}
           style={{
             backgroundColor: '#374151',
-            color: 'white',
+            color: isReplayMode ? '#9ca3af' : 'white',
             border: '1px solid #4b5563',
             borderRadius: '4px',
             fontSize: '10px',
-            width: '110px'
+            width: '110px',
+            cursor: isReplayMode ? 'not-allowed' : 'default'
           }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
@@ -156,20 +212,22 @@ export const Node: React.FC<NodeProps> = ({
             ))}
         </select>
         <button
+          disabled={isReplayMode}
           onClick={(e) => {
             e.stopPropagation();
             handleConnect();
           }}
           data-testid={`connect-btn-${node.id}`}
           style={{
-            backgroundColor: '#10b981',
-            color: 'white',
+            backgroundColor: isReplayMode ? '#4b5563' : '#10b981',
+            color: isReplayMode ? '#9ca3af' : 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: 'pointer',
+            cursor: isReplayMode ? 'not-allowed' : 'pointer',
             fontSize: '10px',
             padding: '2px 6px',
-            flex: 1
+            flex: 1,
+            opacity: isReplayMode ? 0.6 : 1
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >

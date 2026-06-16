@@ -4,13 +4,14 @@ import { NodeType } from '../types';
 import { serializeGraph, deserializeGraph } from '../utils/graphUtils';
 
 export const Sidebar: React.FC = () => {
-  const { nodes, edges, isFallbackMode } = useGraphStore();
+  const { nodes, edges, isFallbackMode, history, selectedRunId } = useGraphStore();
   const [importJson, setImportJson] = React.useState('');
   const [serializedJson, setSerializedJson] = React.useState('');
 
   const nodeTypes: NodeType[] = ['LLM', 'Prompt', 'Tool', 'Router', 'Output', 'VectorDB', 'JSONPath'];
 
   const handleAddNode = (type: NodeType) => {
+    if (selectedRunId !== null) return;
     const offset = nodes.length * 40;
     graphStore.addNode(type, { x: 100 + offset, y: 100 + offset });
   };
@@ -55,6 +56,11 @@ export const Sidebar: React.FC = () => {
       }}
     >
       <h3 style={{ margin: 0 }}>OmniAgent Studio</h3>
+      {selectedRunId !== null && (
+        <div style={{ padding: '6px', backgroundColor: '#b45309', borderRadius: '4px', fontSize: '11px', textAlign: 'center', fontWeight: 'bold' }}>
+          Replay Mode Active
+        </div>
+      )}
       
       <div>
         <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#9ca3af' }}>Nodes Palette</h4>
@@ -63,16 +69,18 @@ export const Sidebar: React.FC = () => {
             <button
               key={type}
               data-testid={`add-node-${type}`}
+              disabled={selectedRunId !== null}
               onClick={() => handleAddNode(type)}
               style={{
                 padding: '6px 12px',
-                backgroundColor: '#3b82f6',
+                backgroundColor: selectedRunId !== null ? '#4b5563' : '#3b82f6',
                 border: 'none',
                 borderRadius: '4px',
-                color: 'white',
-                cursor: 'pointer',
+                color: selectedRunId !== null ? '#9ca3af' : 'white',
+                cursor: selectedRunId !== null ? 'not-allowed' : 'pointer',
                 textAlign: 'left',
-                fontWeight: '500'
+                fontWeight: '500',
+                opacity: selectedRunId !== null ? 0.6 : 1
               }}
             >
               + {type} Node
@@ -137,26 +145,30 @@ export const Sidebar: React.FC = () => {
               onChange={(e) => setImportJson(e.target.value)}
               placeholder="Paste JSON here to import..."
               rows={3}
+              disabled={selectedRunId !== null}
               style={{
                 width: '100%',
                 backgroundColor: '#111827',
-                color: 'white',
+                color: selectedRunId !== null ? '#9ca3af' : 'white',
                 border: '1px solid #374151',
                 borderRadius: '4px',
                 fontSize: '11px',
-                padding: '4px'
+                padding: '4px',
+                cursor: selectedRunId !== null ? 'not-allowed' : 'text'
               }}
             />
             <button
               data-testid="import-btn"
+              disabled={selectedRunId !== null}
               onClick={handleImport}
               style={{
                 padding: '6px 12px',
-                backgroundColor: '#8b5cf6',
+                backgroundColor: selectedRunId !== null ? '#4b5563' : '#8b5cf6',
                 border: 'none',
                 borderRadius: '4px',
-                color: 'white',
-                cursor: 'pointer'
+                color: selectedRunId !== null ? '#9ca3af' : 'white',
+                cursor: selectedRunId !== null ? 'not-allowed' : 'pointer',
+                opacity: selectedRunId !== null ? 0.6 : 1
               }}
             >
               Import Graph
@@ -165,18 +177,109 @@ export const Sidebar: React.FC = () => {
         </div>
       </div>
 
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h4 style={{ margin: 0, fontSize: '14px', color: '#9ca3af' }}>Execution History</h4>
+          {history.length > 0 && (
+            <button
+              data-testid="clear-history-btn"
+              onClick={() => graphStore.clearHistory()}
+              style={{
+                fontSize: '11px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: '#ef4444',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                padding: 0
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <div 
+          data-testid="history-list"
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '8px', 
+            maxHeight: '180px', 
+            overflowY: 'auto',
+            paddingRight: '4px'
+          }}
+        >
+          {history.length === 0 ? (
+            <div style={{ fontSize: '12px', color: '#6b7280', fontStyle: 'italic' }}>No past runs.</div>
+          ) : (
+            history.map((run) => {
+              const isSelected = selectedRunId === run.id;
+              return (
+                <div
+                  key={run.id}
+                  data-testid={`history-entry-${run.id}`}
+                  onClick={() => {
+                    if (isSelected) {
+                      graphStore.selectRun(null);
+                    } else {
+                      graphStore.selectRun(run.id);
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    backgroundColor: isSelected ? '#374151' : '#1f2937',
+                    border: isSelected ? '1px solid #3b82f6' : '1px solid #4b5563',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span
+                        data-testid={`run-status-dot-${run.id}`}
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: run.status === 'success' ? '#10b981' : '#ef4444',
+                          display: 'inline-block'
+                        }}
+                      />
+                      <span style={{ fontWeight: 'bold' }}>{run.status.toUpperCase()}</span>
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                      {run.nodes.length} nodes
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#9ca3af', wordBreak: 'break-all' }}>
+                    {run.timestamp}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
       <button
         data-testid="reset-btn"
+        disabled={selectedRunId !== null}
         onClick={handleReset}
         style={{
           marginTop: 'auto',
           padding: '8px 12px',
-          backgroundColor: '#ef4444',
+          backgroundColor: selectedRunId !== null ? '#4b5563' : '#ef4444',
           border: 'none',
           borderRadius: '4px',
-          color: 'white',
-          cursor: 'pointer',
-          fontWeight: 'bold'
+          color: selectedRunId !== null ? '#9ca3af' : 'white',
+          cursor: selectedRunId !== null ? 'not-allowed' : 'pointer',
+          fontWeight: 'bold',
+          opacity: selectedRunId !== null ? 0.6 : 1
         }}
       >
         Reset Workspace

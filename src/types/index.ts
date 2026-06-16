@@ -46,3 +46,13 @@ export interface TraceStep {
   log?: string;
   tokensConsumed?: number;
 }
+
+export interface RunHistoryEntry {
+  id: string;
+  timestamp: string;
+  nodes: Node[];
+  edges: Edge[];
+  traceSteps: TraceStep[];
+  status: 'success' | 'failure';
+}
+

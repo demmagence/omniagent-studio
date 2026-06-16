@@ -3,7 +3,7 @@ import { useGraphStore, graphStore } from '../store/graphStore';
 import { Node } from './Node';
 
 export const Canvas: React.FC = () => {
-  const { nodes, edges, selectedNodeId } = useGraphStore();
+  const { nodes, edges, selectedNodeId, selectedRunId } = useGraphStore();
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [activeConnection, setActiveConnection] = useState<{
@@ -138,6 +138,7 @@ export const Canvas: React.FC = () => {
   };
 
   const startConnect = (nodeId: string, portType: 'in' | 'out', e: React.MouseEvent) => {
+    if (selectedRunId !== null) return;
     e.stopPropagation();
     e.preventDefault();
 
@@ -210,6 +211,7 @@ export const Canvas: React.FC = () => {
   };
 
   const handleRemoveEdge = (edgeId: string) => {
+    if (selectedRunId !== null) return;
     graphStore.removeEdge(edgeId);
   };
 
@@ -373,12 +375,20 @@ export const Canvas: React.FC = () => {
                 >
                   <span>{srcLabel} → {tgtLabel}</span>
                   <button
+                    disabled={selectedRunId !== null}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleRemoveEdge(edge.id);
                     }}
                     data-testid={`delete-edge-${edge.id}`}
-                    style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: selectedRunId !== null ? '#4b5563' : '#ef4444',
+                      cursor: selectedRunId !== null ? 'not-allowed' : 'pointer',
+                      fontWeight: 'bold',
+                      opacity: selectedRunId !== null ? 0.5 : 1
+                    }}
                   >
                     Remove
                   </button>

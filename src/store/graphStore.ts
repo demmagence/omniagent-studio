@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Node, Edge, TraceStep, NodeType, NodeData } from '../types';
+import { Node, Edge, TraceStep, NodeType, NodeData, RunHistoryEntry } from '../types';
 
 export interface GraphStoreState {
   nodes: Node[];
@@ -8,6 +8,8 @@ export interface GraphStoreState {
   traceSteps: TraceStep[];
   isRunning: boolean;
   isFallbackMode: boolean;
+  history: RunHistoryEntry[];
+  selectedRunId: string | null;
 }
 
 type Listener = (state: GraphStoreState) => void;
@@ -20,7 +22,11 @@ class GraphStore {
     traceSteps: [],
     isRunning: false,
     isFallbackMode: true,
+    history: [],
+    selectedRunId: null,
   };
+
+  private draft: { nodes: Node[]; edges: Edge[]; traceSteps: TraceStep[] } | null = null;
 
   private listeners = new Set<Listener>();
 
@@ -147,6 +153,55 @@ class GraphStore {
     this.emit();
   }
 
+  addRunToHistory(run: Omit<RunHistoryEntry, 'id' | 'timestamp'>) {
+    const newEntry: RunHistoryEntry = {
+      id: `run_${Math.random().toString(36).substring(2, 9)}`,
+      timestamp: new Date().toISOString(),
+      nodes: JSON.parse(JSON.stringify(run.nodes)),
+      edges: JSON.parse(JSON.stringify(run.edges)),
+      traceSteps: JSON.parse(JSON.stringify(run.traceSteps)),
+      status: run.status,
+    };
+    this.state.history = [...this.state.history, newEntry];
+    this.emit();
+  }
+
+  selectRun(runId: string | null) {
+    if (runId === null) {
+      if (this.draft) {
+        this.state.nodes = [...this.draft.nodes];
+        this.state.edges = [...this.draft.edges];
+        this.state.traceSteps = [...this.draft.traceSteps];
+        this.draft = null;
+      }
+      this.state.selectedRunId = null;
+    } else {
+      const run = this.state.history.find((r) => r.id === runId);
+      if (run) {
+        if (this.state.selectedRunId === null) {
+          this.draft = {
+            nodes: [...this.state.nodes],
+            edges: [...this.state.edges],
+            traceSteps: [...this.state.traceSteps],
+          };
+        }
+        this.state.nodes = [...run.nodes];
+        this.state.edges = [...run.edges];
+        this.state.traceSteps = [...run.traceSteps];
+        this.state.selectedRunId = runId;
+      }
+    }
+    this.emit();
+  }
+
+  clearHistory() {
+    this.state.history = [];
+    if (this.state.selectedRunId !== null) {
+      this.selectRun(null);
+    }
+    this.emit();
+  }
+
   resetGraph() {
     this.state = {
       nodes: [],
@@ -155,7 +210,10 @@ class GraphStore {
       traceSteps: [],
       isRunning: false,
       isFallbackMode: true,
+      history: [],
+      selectedRunId: null,
     };
+    this.draft = null;
     this.emit();
   }
 }

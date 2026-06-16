@@ -3,7 +3,7 @@ import { useGraphStore } from '../store/graphStore';
 import { executeWorkflow } from '../services/executor';
 
 export const TracingConsole: React.FC = () => {
-  const { traceSteps, isRunning, nodes } = useGraphStore();
+  const { traceSteps, isRunning, nodes, selectedRunId } = useGraphStore();
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   const handleRun = async () => {
@@ -40,7 +40,7 @@ export const TracingConsole: React.FC = () => {
           </span>
           <button
             data-testid="run-workflow-btn"
-            disabled={isRunning || nodes.length === 0}
+            disabled={isRunning || nodes.length === 0 || selectedRunId !== null}
             onClick={handleRun}
             style={{
               padding: '6px 16px',

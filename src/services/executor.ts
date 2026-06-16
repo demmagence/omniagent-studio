@@ -38,7 +38,10 @@ export interface ExecutionOptions {
 }
 
 export async function executeWorkflow(options: ExecutionOptions = {}): Promise<TraceStep[]> {
-  const { nodes, edges, isFallbackMode } = graphStore.getState();
+  const { nodes, edges, isFallbackMode, selectedRunId } = graphStore.getState();
+  if (selectedRunId !== null) {
+    throw new Error('Cannot execute workflow during replay');
+  }
   const fallback = options.fallback !== undefined ? options.fallback : isFallbackMode;
   const timeoutMs = options.timeoutMs !== undefined ? options.timeoutMs : 30000;
 
@@ -64,6 +67,12 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
     }));
     graphStore.setTraceSteps(failedSteps);
     graphStore.setIsRunning(false);
+    graphStore.addRunToHistory({
+      nodes,
+      edges,
+      traceSteps: failedSteps,
+      status: 'failure'
+    });
     throw new Error(errorMsg);
   }
 
@@ -312,6 +321,12 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
   try {
     const result = await Promise.race([runPromise, timeoutPromise]);
     graphStore.setIsRunning(false);
+    graphStore.addRunToHistory({
+      nodes,
+      edges,
+      traceSteps: graphStore.getState().traceSteps,
+      status: 'success'
+    });
     return result;
   } catch (error) {
     graphStore.setIsRunning(false);
@@ -326,6 +341,12 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
       return step;
     });
     graphStore.setTraceSteps(finalSteps);
+    graphStore.addRunToHistory({
+      nodes,
+      edges,
+      traceSteps: finalSteps,
+      status: 'failure'
+    });
     throw error;
   }
 }
