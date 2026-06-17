@@ -59,6 +59,36 @@ function parseFetchRequest(url: unknown, init: RequestInit | undefined): { promp
   return { prompt };
 }
 
+// Build a mocked `fetch` that validates each request (via parseFetchRequest)
+// and tracks the peak number of concurrently in-flight calls with a simple
+// counter — avoiding array index/splice bookkeeping that is easy to mis-track
+// under interleaved resolutions. Returns the mock plus a getter for the
+// observed peak, so the concurrency-ceiling tests share one implementation
+// instead of duplicating it.
+function createConcurrencyTrackingFetch(delayMs: number = NODE_EXECUTION_DELAY_MS) {
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const mockFetch = vi.fn().mockImplementation((url, init) => {
+    parseFetchRequest(url, init);
+    inFlight++;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        inFlight--;
+        resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            choices: [{ message: { content: 'done' } }],
+            usage: { total_tokens: 5 },
+          }),
+        });
+      }, delayMs);
+    });
+  });
+  return { mockFetch, getMaxInFlight: () => maxInFlight };
+}
+
 describe('Milestone 8: Parallel Execution Core', () => {
   beforeEach(() => {
     act(() => {
@@ -75,33 +105,9 @@ describe('Milestone 8: Parallel Execution Core', () => {
     graphStore.addNode('LLM');
     graphStore.addNode('LLM');
 
-    // We stub fetch to take some time
-    const activeRequests: string[] = [];
-    // Tracks the peak number of concurrently in-flight requests observed.
-    let maxActiveRequests = 0;
-
-    const mockFetch = vi.fn().mockImplementation((url, init) => {
-      const { prompt } = parseFetchRequest(url, init);
-      activeRequests.push(prompt);
-      maxActiveRequests = Math.max(maxActiveRequests, activeRequests.length);
-
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          const idx = activeRequests.indexOf(prompt);
-          if (idx !== -1) {
-            activeRequests.splice(idx, 1);
-          }
-          resolve({
-            ok: true,
-            status: 200,
-            json: async () => ({
-              choices: [{ message: { content: `Response to ${prompt}` } }],
-              usage: { total_tokens: 10 }
-            })
-          });
-        }, CONCURRENT_NODE_DELAY_MS);
-      });
-    });
+    // Stub fetch with a concurrency-tracking mock so we can assert the peak
+    // number of simultaneously in-flight requests never exceeds maxConcurrency.
+    const { mockFetch, getMaxInFlight } = createConcurrencyTrackingFetch(CONCURRENT_NODE_DELAY_MS);
     vi.stubGlobal('fetch', mockFetch);
 
     // Run workflow with maxConcurrency = 2
@@ -131,7 +137,7 @@ describe('Milestone 8: Parallel Execution Core', () => {
     // Finally all should be completed
     const finalSteps = graphStore.getState().traceSteps;
     expect(finalSteps.every(s => s.status === 'completed')).toBe(true);
-    expect(maxActiveRequests).toBeLessThanOrEqual(maxConcurrency);
+    expect(getMaxInFlight()).toBeLessThanOrEqual(maxConcurrency);
   });
 
   it('performs fail-fast abort on node execution failure', async () => {
@@ -217,34 +223,12 @@ describe('Milestone 8: Parallel Execution Core', () => {
     graphStore.addNode('LLM');
     graphStore.addNode('LLM');
 
-    let maxRunning = 0;
-    let currentlyRunning = 0;
-
-    const mockFetch = vi.fn().mockImplementation((url, init) => {
-      // This test only cares about concurrency, but validate the request shape
-      // anyway so the mock is exercised the same way the real client invokes it.
-      parseFetchRequest(url, init);
-      currentlyRunning++;
-      maxRunning = Math.max(maxRunning, currentlyRunning);
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          currentlyRunning--;
-          resolve({
-            ok: true,
-            status: 200,
-            json: async () => ({
-              choices: [{ message: { content: 'done' } }],
-              usage: { total_tokens: 5 }
-            })
-          });
-        }, NODE_EXECUTION_DELAY_MS);
-      });
-    });
+    const { mockFetch, getMaxInFlight } = createConcurrencyTrackingFetch();
     vi.stubGlobal('fetch', mockFetch);
 
     await executeWorkflow({ fallback: false, maxConcurrency: 1 });
 
-    expect(maxRunning).toBe(1);
+    expect(getMaxInFlight()).toBe(1);
     const steps = graphStore.getState().traceSteps;
     expect(steps.every(s => s.status === 'completed')).toBe(true);
   });
@@ -258,35 +242,13 @@ describe('Milestone 8: Parallel Execution Core', () => {
       graphStore.addNode('LLM');
     });
 
-    let maxRunning = 0;
-    let currentlyRunning = 0;
-
-    const mockFetch = vi.fn().mockImplementation((url, init) => {
-      // This test only cares about concurrency, but validate the request shape
-      // anyway so the mock is exercised the same way the real client invokes it.
-      parseFetchRequest(url, init);
-      currentlyRunning++;
-      maxRunning = Math.max(maxRunning, currentlyRunning);
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          currentlyRunning--;
-          resolve({
-            ok: true,
-            status: 200,
-            json: async () => ({
-              choices: [{ message: { content: 'done' } }],
-              usage: { total_tokens: 5 }
-            })
-          });
-        }, NODE_EXECUTION_DELAY_MS);
-      });
-    });
+    const { mockFetch, getMaxInFlight } = createConcurrencyTrackingFetch();
     vi.stubGlobal('fetch', mockFetch);
 
     // executeWorkflow called WITHOUT maxConcurrency option should fallback to store setting (1)
     await executeWorkflow({ fallback: false });
 
-    expect(maxRunning).toBe(1);
+    expect(getMaxInFlight()).toBe(1);
     const steps = graphStore.getState().traceSteps;
     expect(steps.every(s => s.status === 'completed')).toBe(true);
   });
