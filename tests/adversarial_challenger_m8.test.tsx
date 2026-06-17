@@ -4,8 +4,9 @@ import { executeWorkflow } from '../src/services/executor';
 
 describe('Milestone 8: Adversarial & Stress Testing', () => {
   let unsafeEdgeCounter = 0;
-  const addEdgeUnsafeForTest = (source: string, target: string, id = `cycle_${++unsafeEdgeCounter}`) => {
-    const unsafeEdge = { id, source, target };
+  const addEdgeUnsafeForTest = (source: string, target: string, id?: string) => {
+    const resolvedId = id ?? `cycle_${++unsafeEdgeCounter}`;
+    const unsafeEdge = { id: resolvedId, source, target };
     const state = graphStore.getState();
     graphStore.setGraph(state.nodes, [...state.edges, unsafeEdge]);
   };
@@ -174,11 +175,9 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     // The output node should have received inputs from all parallel branches
     const endStep = steps.find(s => s.nodeId === nEnd.id);
     expect(endStep).toBeDefined();
-    expect(endStep?.input).toBeDefined();
-    if (!endStep || !endStep.input) {
-      throw new Error('Expected output step with defined input');
-    }
-    expect(Object.keys(endStep.input).length).toBe(50);
+    const endInput = endStep?.input;
+    expect(endInput).toBeDefined();
+    expect(Object.keys(endInput ?? {}).length).toBe(50);
   });
 
   // ==========================================
