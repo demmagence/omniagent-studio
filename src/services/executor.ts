@@ -140,7 +140,12 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
                 : 'Default Prompt';
             
             nodeInput = prompt;
-            log = `Calling ${node.data.provider || 'openai'} model: ${node.data.model || 'default'}`;
+            const callLog = `Calling ${node.data.provider || 'openai'} model: ${node.data.model || 'default'}`;
+            graphStore.updateTraceStep({
+              nodeId,
+              status: 'running',
+              log: callLog,
+            });
 
             const response = await callLLM(
               node.data.provider || 'openai',
@@ -156,7 +161,7 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
 
             nodeOutput = response.text;
             tokensUsed = response.tokensUsed;
-            log = `Received LLM response. Tokens used: ${tokensUsed}`;
+            log = `${callLog}\nReceived LLM response. Tokens used: ${tokensUsed}`;
             break;
           }
 
