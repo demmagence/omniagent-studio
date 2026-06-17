@@ -146,10 +146,18 @@ describe('Milestone 8: Parallel Execution Core', () => {
     const n3 = graphStore.addNode('LLM'); // This one will take longer and should be aborted
 
     let n3Aborted = false;
+    // Records which node prompts actually reached the fetch mock (i.e. started
+    // executing), so we can later assert n3 was in-flight when the abort fired.
+    const startedPrompts = new Set<string>();
 
     const mockFetch = vi.fn().mockImplementation((url, init) => {
       const { prompt } = parseFetchRequest(url, init);
+      startedPrompts.add(prompt);
       const signal = init.signal;
+      // The executor must wire an AbortSignal so fail-fast abort can interrupt
+      // in-flight requests; assert it here so a regression that drops the signal
+      // (silently skipping the abort path) is caught instead of passing quietly.
+      expect(signal).toBeDefined();
 
       return new Promise((resolve, reject) => {
         const onAbort = () => {
@@ -207,6 +215,11 @@ describe('Milestone 8: Parallel Execution Core', () => {
 
     // Node 3 should have been aborted
     expect(n3Aborted).toBe(true);
+    // ...and its fetch must have actually started before the abort fired,
+    // confirming the abort interrupted an in-flight request rather than
+    // preventing n3 from ever executing. n3 (SLOW_NODE_DELAY_MS) is still
+    // pending when n2 (FAST_NODE_DELAY_MS) rejects, so it is aborted mid-flight.
+    expect(startedPrompts.has('n3')).toBe(true);
 
     const steps = graphStore.getState().traceSteps;
     const n3Step = steps.find(s => s.nodeId === n3.id);
