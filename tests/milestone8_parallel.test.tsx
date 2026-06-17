@@ -38,6 +38,27 @@ async function waitFor(
   }
 }
 
+// Validate the shape of a mocked `fetch` call and extract the prompt (the last
+// chat message's content). Centralises the guards every mock needs: it asserts
+// the request is a well-formed POST whose JSON body carries a non-empty
+// `messages` array, so a malformed call (missing init/body, non-JSON body, or
+// unexpected shape) fails with a clear assertion instead of an opaque
+// "Cannot read properties of undefined" thrown deep inside the mock.
+function parseFetchRequest(url: unknown, init: RequestInit | undefined): { prompt: string } {
+  expect(init).toBeDefined();
+  expect(typeof url === 'string' || url instanceof URL).toBe(true);
+  expect(init!.method).toBe('POST');
+  expect(typeof init!.body).toBe('string');
+
+  const body = JSON.parse(init!.body as string);
+  expect(Array.isArray(body.messages)).toBe(true);
+  expect(body.messages.length).toBeGreaterThan(0);
+
+  const prompt = body.messages[body.messages.length - 1].content;
+  expect(typeof prompt).toBe('string');
+  return { prompt };
+}
+
 describe('Milestone 8: Parallel Execution Core', () => {
   beforeEach(() => {
     act(() => {
@@ -59,9 +80,8 @@ describe('Milestone 8: Parallel Execution Core', () => {
     // Tracks the peak number of concurrently in-flight requests observed.
     let maxActiveRequests = 0;
 
-    const mockFetch = vi.fn().mockImplementation((_url, init) => {
-      const body = JSON.parse(init.body);
-      const prompt = body.messages[body.messages.length - 1].content;
+    const mockFetch = vi.fn().mockImplementation((url, init) => {
+      const { prompt } = parseFetchRequest(url, init);
       activeRequests.push(prompt);
       maxActiveRequests = Math.max(maxActiveRequests, activeRequests.length);
 
@@ -121,9 +141,8 @@ describe('Milestone 8: Parallel Execution Core', () => {
 
     let n3Aborted = false;
 
-    const mockFetch = vi.fn().mockImplementation((_url, init) => {
-      const body = JSON.parse(init.body);
-      const prompt = body.messages[body.messages.length - 1].content;
+    const mockFetch = vi.fn().mockImplementation((url, init) => {
+      const { prompt } = parseFetchRequest(url, init);
       const signal = init.signal;
 
       return new Promise((resolve, reject) => {
@@ -201,7 +220,10 @@ describe('Milestone 8: Parallel Execution Core', () => {
     let maxRunning = 0;
     let currentlyRunning = 0;
 
-    const mockFetch = vi.fn().mockImplementation(() => {
+    const mockFetch = vi.fn().mockImplementation((url, init) => {
+      // This test only cares about concurrency, but validate the request shape
+      // anyway so the mock is exercised the same way the real client invokes it.
+      parseFetchRequest(url, init);
       currentlyRunning++;
       maxRunning = Math.max(maxRunning, currentlyRunning);
       return new Promise((resolve) => {
@@ -239,7 +261,10 @@ describe('Milestone 8: Parallel Execution Core', () => {
     let maxRunning = 0;
     let currentlyRunning = 0;
 
-    const mockFetch = vi.fn().mockImplementation(() => {
+    const mockFetch = vi.fn().mockImplementation((url, init) => {
+      // This test only cares about concurrency, but validate the request shape
+      // anyway so the mock is exercised the same way the real client invokes it.
+      parseFetchRequest(url, init);
       currentlyRunning++;
       maxRunning = Math.max(maxRunning, currentlyRunning);
       return new Promise((resolve) => {
