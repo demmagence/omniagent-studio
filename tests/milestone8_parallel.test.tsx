@@ -4,6 +4,30 @@ import { Sidebar } from '../src/components/Sidebar';
 import { graphStore } from '../src/store/graphStore';
 import { executeWorkflow } from '../src/services/executor';
 
+// Simulated per-request latencies for the mocked LLM fetch. Named so the
+// relative ordering (a fast-failing node vs. a slower one that must be aborted)
+// is explicit rather than encoded in bare numbers.
+const FAST_NODE_DELAY_MS = 20;
+const SLOW_NODE_DELAY_MS = 100;
+// Uniform simulated latency used when only the concurrency ceiling matters.
+const NODE_EXECUTION_DELAY_MS = 30;
+
+// Poll a condition instead of sleeping for a fixed duration, so timing-sensitive
+// assertions don't race against the scheduler. Rejects if the condition never
+// becomes true within the timeout.
+async function waitFor(
+  condition: () => boolean,
+  { timeout = 1000, interval = 5 }: { timeout?: number; interval?: number } = {}
+): Promise<void> {
+  const start = Date.now();
+  while (!condition()) {
+    if (Date.now() - start > timeout) {
+      throw new Error('waitFor: condition not met before timeout');
+    }
+    await new Promise((r) => setTimeout(r, interval));
+  }
+}
+
 describe('Milestone 8: Parallel Execution Core', () => {
   beforeEach(() => {
     act(() => {
@@ -50,22 +74,27 @@ describe('Milestone 8: Parallel Execution Core', () => {
     vi.stubGlobal('fetch', mockFetch);
 
     // Run workflow with maxConcurrency = 2
-    const promise = executeWorkflow({ fallback: false, maxConcurrency: 2 });
-    
-    // Wait slightly to let the first batch start
-    await new Promise(r => setTimeout(r, 15));
-    
-    // We have 4 nodes, so initially 2 should be running and 2 pending
+    const maxConcurrency = 2;
+    const promise = executeWorkflow({ fallback: false, maxConcurrency });
+
+    // Wait until the scheduler has actually started a node rather than sleeping
+    // for a fixed duration. The concurrency ceiling holds at every moment of the
+    // run, so sampling once a node is running is sufficient to verify it.
+    await waitFor(() =>
+      graphStore.getState().traceSteps.some(s => s.status === 'running')
+    );
+
+    // We have 4 nodes, so no more than `maxConcurrency` may be running at once.
     const stepsDuring = graphStore.getState().traceSteps;
     const runningCount = stepsDuring.filter(s => s.status === 'running').length;
-    expect(runningCount).toBeLessThanOrEqual(2);
-    
+    expect(runningCount).toBeLessThanOrEqual(maxConcurrency);
+
     await promise;
 
     // Finally all should be completed
     const finalSteps = graphStore.getState().traceSteps;
     expect(finalSteps.every(s => s.status === 'completed')).toBe(true);
-    expect(maxActiveRequests.val).toBeLessThanOrEqual(2);
+    expect(maxActiveRequests.val).toBeLessThanOrEqual(maxConcurrency);
   });
 
   it('performs fail-fast abort on node execution failure', async () => {
@@ -108,7 +137,7 @@ describe('Milestone 8: Parallel Execution Core', () => {
               })
             });
           }
-        }, prompt === 'n2' ? 20 : 100);
+        }, prompt === 'n2' ? FAST_NODE_DELAY_MS : SLOW_NODE_DELAY_MS);
       });
     });
     vi.stubGlobal('fetch', mockFetch);
@@ -165,7 +194,7 @@ describe('Milestone 8: Parallel Execution Core', () => {
               usage: { total_tokens: 5 }
             })
           });
-        }, 30);
+        }, NODE_EXECUTION_DELAY_MS);
       });
     });
     vi.stubGlobal('fetch', mockFetch);
@@ -203,7 +232,7 @@ describe('Milestone 8: Parallel Execution Core', () => {
               usage: { total_tokens: 5 }
             })
           });
-        }, 30);
+        }, NODE_EXECUTION_DELAY_MS);
       });
     });
     vi.stubGlobal('fetch', mockFetch);
