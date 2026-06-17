@@ -11,18 +11,28 @@ const FAST_NODE_DELAY_MS = 20;
 const SLOW_NODE_DELAY_MS = 100;
 // Uniform simulated latency used when only the concurrency ceiling matters.
 const NODE_EXECUTION_DELAY_MS = 30;
+// Per-node latency for the concurrency-ceiling probe test. Kept comfortably
+// above the waitFor poll interval so a node is observably 'running' mid-flight.
+const CONCURRENT_NODE_DELAY_MS = 50;
 
 // Poll a condition instead of sleeping for a fixed duration, so timing-sensitive
-// assertions don't race against the scheduler. Rejects if the condition never
-// becomes true within the timeout.
+// assertions don't race against the scheduler. If the condition is never met
+// (e.g. a scheduler regression where no node ever starts), this rejects with a
+// descriptive error naming what was awaited — turning that failure mode into a
+// meaningful, explicit test failure instead of a silent hang. The behaviour is
+// exercised directly by the "waitFor rejects ..." test below.
 async function waitFor(
   condition: () => boolean,
-  { timeout = 1000, interval = 5 }: { timeout?: number; interval?: number } = {}
+  {
+    timeout = 1000,
+    interval = 5,
+    description = 'condition',
+  }: { timeout?: number; interval?: number; description?: string } = {}
 ): Promise<void> {
   const start = Date.now();
   while (!condition()) {
     if (Date.now() - start > timeout) {
-      throw new Error('waitFor: condition not met before timeout');
+      throw new Error(`waitFor: ${description} not met before ${timeout}ms timeout`);
     }
     await new Promise((r) => setTimeout(r, interval));
   }
@@ -46,13 +56,14 @@ describe('Milestone 8: Parallel Execution Core', () => {
 
     // We stub fetch to take some time
     const activeRequests: string[] = [];
-    const maxActiveRequests = { val: 0 };
+    // Tracks the peak number of concurrently in-flight requests observed.
+    let maxActiveRequests = 0;
 
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
       const body = JSON.parse(init.body);
       const prompt = body.messages[body.messages.length - 1].content;
       activeRequests.push(prompt);
-      maxActiveRequests.val = Math.max(maxActiveRequests.val, activeRequests.length);
+      maxActiveRequests = Math.max(maxActiveRequests, activeRequests.length);
 
       return new Promise((resolve) => {
         setTimeout(() => {
@@ -68,7 +79,7 @@ describe('Milestone 8: Parallel Execution Core', () => {
               usage: { total_tokens: 10 }
             })
           });
-        }, 50);
+        }, CONCURRENT_NODE_DELAY_MS);
       });
     });
     vi.stubGlobal('fetch', mockFetch);
@@ -79,9 +90,12 @@ describe('Milestone 8: Parallel Execution Core', () => {
 
     // Wait until the scheduler has actually started a node rather than sleeping
     // for a fixed duration. The concurrency ceiling holds at every moment of the
-    // run, so sampling once a node is running is sufficient to verify it.
-    await waitFor(() =>
-      graphStore.getState().traceSteps.some(s => s.status === 'running')
+    // run, so sampling once a node is running is sufficient to verify it. If no
+    // node ever starts, waitFor rejects with the description below instead of
+    // hanging (see the dedicated waitFor timeout test).
+    await waitFor(
+      () => graphStore.getState().traceSteps.some(s => s.status === 'running'),
+      { description: 'a node to reach running status' }
     );
 
     // We have 4 nodes, so no more than `maxConcurrency` may be running at once.
@@ -97,7 +111,7 @@ describe('Milestone 8: Parallel Execution Core', () => {
     // Finally all should be completed
     const finalSteps = graphStore.getState().traceSteps;
     expect(finalSteps.every(s => s.status === 'completed')).toBe(true);
-    expect(maxActiveRequests.val).toBeLessThanOrEqual(maxConcurrency);
+    expect(maxActiveRequests).toBeLessThanOrEqual(maxConcurrency);
   });
 
   it('performs fail-fast abort on node execution failure', async () => {
@@ -172,8 +186,11 @@ describe('Milestone 8: Parallel Execution Core', () => {
     const steps = graphStore.getState().traceSteps;
     const n3Step = steps.find(s => s.nodeId === n3.id);
     expect(n3Step).toBeDefined();
-    expect(n3Step?.status).toBe('failed');
-    expect(n3Step?.log).toContain('Aborted:');
+    // The assertion above guarantees presence; use a non-null assertion rather
+    // than optional chaining so a regression that drops the step fails loudly
+    // instead of being silently masked by `?.` short-circuiting to undefined.
+    expect(n3Step!.status).toBe('failed');
+    expect(n3Step!.log).toContain('Aborted:');
   });
 
   it('respects maxConcurrency option of 1 (sequential execution)', async () => {
@@ -258,5 +275,14 @@ describe('Milestone 8: Parallel Execution Core', () => {
     fireEvent.change(maxConcurrencyInput, { target: { value: '5' } });
 
     expect(graphStore.getState().maxConcurrency).toBe(5);
+  });
+
+  it('waitFor rejects with a descriptive error when the condition is never met', async () => {
+    // Explicitly exercises the timeout failure mode the concurrency test relies
+    // on: when the awaited condition never becomes true, waitFor must reject
+    // (not hang) with a message naming what was awaited.
+    await expect(
+      waitFor(() => false, { timeout: 20, interval: 5, description: 'an impossible condition' })
+    ).rejects.toThrow('an impossible condition not met before 20ms timeout');
   });
 });
