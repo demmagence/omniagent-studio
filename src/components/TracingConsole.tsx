@@ -5,6 +5,32 @@ import { executeWorkflow } from '../services/executor';
 export const TracingConsole: React.FC = () => {
   const { traceSteps, isRunning, nodes, selectedRunId } = useGraphStore();
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+  const [elapsedTime, setElapsedTime] = React.useState<number>(0);
+  const timerRef = React.useRef<any>(null);
+  const startTimeRef = React.useRef<number>(0);
+
+  React.useEffect(() => {
+    if (isRunning) {
+      startTimeRef.current = Date.now();
+      setElapsedTime(0);
+      timerRef.current = setInterval(() => {
+        setElapsedTime(Date.now() - startTimeRef.current);
+      }, 50);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+        if (startTimeRef.current > 0) {
+          setElapsedTime(Date.now() - startTimeRef.current);
+        }
+      }
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [isRunning]);
 
   const handleRun = async () => {
     setErrorMsg(null);
@@ -16,6 +42,10 @@ export const TracingConsole: React.FC = () => {
   };
 
   const totalTokens = traceSteps.reduce((acc, step) => acc + (step.tokensConsumed || 0), 0);
+  const completedCount = traceSteps.filter((s) => s.status === 'completed').length;
+  const failedCount = traceSteps.filter((s) => s.status === 'failed').length;
+  const pendingCount = traceSteps.filter((s) => s.status === 'pending').length;
+  const runningCount = traceSteps.filter((s) => s.status === 'running').length;
 
   return (
     <div
@@ -56,6 +86,43 @@ export const TracingConsole: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {traceSteps.length > 0 && (
+        <div
+          data-testid="execution-stats"
+          style={{
+            display: 'flex',
+            gap: '16px',
+            backgroundColor: '#111827',
+            padding: '8px 12px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: '#9ca3af',
+            border: '1px solid #374151',
+          }}
+        >
+          <div>
+            Completed: <strong style={{ color: '#10b981' }} data-testid="stats-completed">{completedCount}</strong>
+          </div>
+          <div>
+            Failed: <strong style={{ color: '#ef4444' }} data-testid="stats-failed">{failedCount}</strong>
+          </div>
+          <div>
+            Pending: <strong style={{ color: '#9ca3af' }} data-testid="stats-pending">{pendingCount}</strong>
+          </div>
+          {runningCount > 0 && (
+            <div>
+              Running: <strong style={{ color: '#fbbf24' }} data-testid="stats-running">{runningCount}</strong>
+            </div>
+          )}
+          <div>
+            Elapsed Time:{' '}
+            <strong style={{ color: '#60a5fa' }} data-testid="stats-elapsed">
+              {(elapsedTime / 1000).toFixed(2)}s
+            </strong>
+          </div>
+        </div>
+      )}
 
       {errorMsg && (
         <div

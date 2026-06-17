@@ -1,7 +1,7 @@
 import React from 'react';
 import { graphStore, useGraphStore } from '../store/graphStore';
 import { NodeType } from '../types';
-import { serializeGraph, deserializeGraph } from '../utils/graphUtils';
+import { serializeGraph, deserializeGraph, autoLayout } from '../utils/graphUtils';
 
 export const Sidebar: React.FC = () => {
   const { nodes, edges, isFallbackMode, history, selectedRunId, maxConcurrency } = useGraphStore();
@@ -39,6 +39,14 @@ export const Sidebar: React.FC = () => {
 
   const handleToggleFallback = (e: React.ChangeEvent<HTMLInputElement>) => {
     graphStore.setFallbackMode(e.target.checked);
+  };
+
+  const handleAutoLayout = () => {
+    if (selectedRunId !== null) return;
+    const positions = autoLayout(nodes, edges);
+    positions.forEach((pos, nodeId) => {
+      graphStore.updateNodePosition(nodeId, pos);
+    });
   };
 
   return (
@@ -87,6 +95,28 @@ export const Sidebar: React.FC = () => {
             </button>
           ))}
         </div>
+      </div>
+
+      <div>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#9ca3af' }}>Layout</h4>
+        <button
+          data-testid="auto-layout-btn"
+          disabled={selectedRunId !== null}
+          onClick={handleAutoLayout}
+          style={{
+            width: '100%',
+            padding: '6px 12px',
+            backgroundColor: selectedRunId !== null ? '#4b5563' : '#8b5cf6',
+            border: 'none',
+            borderRadius: '4px',
+            color: selectedRunId !== null ? '#9ca3af' : 'white',
+            cursor: selectedRunId !== null ? 'not-allowed' : 'pointer',
+            fontWeight: '500',
+            opacity: selectedRunId !== null ? 0.6 : 1
+          }}
+        >
+          Auto Layout Graph
+        </button>
       </div>
 
       <div>

@@ -23,6 +23,29 @@ export const Canvas: React.FC = () => {
   }, [zoom, pan]);
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement as HTMLElement | null;
+      if (activeEl) {
+        const tagName = activeEl.tagName.toLowerCase();
+        if (tagName === 'input' || tagName === 'textarea' || tagName === 'select' || activeEl.isContentEditable) {
+          return;
+        }
+      }
+
+      if (e.key === 'Escape') {
+        graphStore.selectNode(null);
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeId && selectedRunId === null) {
+        graphStore.removeNode(selectedNodeId);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedNodeId, selectedRunId]);
+
+  useEffect(() => {
     const canvasEl = canvasRef.current;
     if (!canvasEl) return;
 
