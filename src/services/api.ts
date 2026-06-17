@@ -12,6 +12,7 @@ export async function callLLM(
     apiKey?: string;
     endpointUrl?: string;
     fallback?: boolean;
+    signal?: AbortSignal;
   } = {}
 ): Promise<LLMResponse> {
   if (options.fallback) {
@@ -42,6 +43,7 @@ export async function callLLM(
           { role: 'user', content: prompt }
         ],
       }),
+      signal: options.signal,
     });
 
     if (!response.ok) {
@@ -66,6 +68,7 @@ export async function callLLM(
         system: options.systemPrompt,
         stream: false,
       }),
+      signal: options.signal,
     });
 
     if (!response.ok) {
