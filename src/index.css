@@ -1,3 +1,29 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes edge-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.edge-flow-running {
+  stroke-dasharray: 8 4;
+  animation: edge-flow 1s linear infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    stroke-width: 3;
+    opacity: 0.9;
+  }
+  50% {
+    stroke-width: 4.5;
+    opacity: 1;
+  }
+}
+
+.edge-pulse-completed {
+  animation: pulse-glow 2s ease-in-out infinite;
+}

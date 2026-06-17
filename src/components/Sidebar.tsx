@@ -7,8 +7,23 @@ export const Sidebar: React.FC = () => {
   const { nodes, edges, isFallbackMode, history, selectedRunId, maxConcurrency } = useGraphStore();
   const [importJson, setImportJson] = React.useState('');
   const [serializedJson, setSerializedJson] = React.useState('');
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [selectedCategory, setSelectedCategory] = React.useState<'All' | 'AI & Logic' | 'Database & Tools' | 'Output'>('All');
 
   const nodeTypes: NodeType[] = ['LLM', 'Prompt', 'Tool', 'Router', 'Output', 'VectorDB', 'JSONPath'];
+
+  const getCategoryForType = (type: NodeType): string => {
+    if (type === 'LLM' || type === 'Prompt' || type === 'Router') return 'AI & Logic';
+    if (type === 'Tool' || type === 'VectorDB' || type === 'JSONPath') return 'Database & Tools';
+    if (type === 'Output') return 'Output';
+    return 'All';
+  };
+
+  const filteredNodeTypes = nodeTypes.filter((type) => {
+    const matchesSearch = type.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'All' || getCategoryForType(type) === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   const handleAddNode = (type: NodeType) => {
     if (selectedRunId !== null) return;
@@ -72,28 +87,82 @@ export const Sidebar: React.FC = () => {
       
       <div>
         <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#9ca3af' }}>Nodes Palette</h4>
+        
+        {/* Search Input */}
+        <input
+          data-testid="node-palette-search"
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search node types..."
+          style={{
+            width: '100%',
+            backgroundColor: '#111827',
+            border: '1px solid #374151',
+            borderRadius: '4px',
+            color: 'white',
+            padding: '4px 8px',
+            fontSize: '12px',
+            marginBottom: '8px',
+            boxSizing: 'border-box',
+          }}
+        />
+
+        {/* Category Filters */}
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '8px', flexWrap: 'wrap' }}>
+          {(['All', 'AI & Logic', 'Database & Tools', 'Output'] as const).map((cat) => {
+            const isSelected = selectedCategory === cat;
+            return (
+              <button
+                key={cat}
+                data-testid={`category-tab-${cat.replace(/\s+/g, '-')}`}
+                onClick={() => setSelectedCategory(cat)}
+                style={{
+                  padding: '3px 6px',
+                  fontSize: '10px',
+                  backgroundColor: isSelected ? '#3b82f6' : '#374151',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontWeight: isSelected ? 'bold' : 'normal',
+                }}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Node Types List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {nodeTypes.map((type) => (
-            <button
-              key={type}
-              data-testid={`add-node-${type}`}
-              disabled={selectedRunId !== null}
-              onClick={() => handleAddNode(type)}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: selectedRunId !== null ? '#4b5563' : '#3b82f6',
-                border: 'none',
-                borderRadius: '4px',
-                color: selectedRunId !== null ? '#9ca3af' : 'white',
-                cursor: selectedRunId !== null ? 'not-allowed' : 'pointer',
-                textAlign: 'left',
-                fontWeight: '500',
-                opacity: selectedRunId !== null ? 0.6 : 1
-              }}
-            >
-              + {type} Node
-            </button>
-          ))}
+          {filteredNodeTypes.length === 0 ? (
+            <div style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic', padding: '4px' }}>
+              No matching node types.
+            </div>
+          ) : (
+            filteredNodeTypes.map((type) => (
+              <button
+                key={type}
+                data-testid={`add-node-${type}`}
+                disabled={selectedRunId !== null}
+                onClick={() => handleAddNode(type)}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: selectedRunId !== null ? '#4b5563' : '#3b82f6',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: selectedRunId !== null ? '#9ca3af' : 'white',
+                  cursor: selectedRunId !== null ? 'not-allowed' : 'pointer',
+                  textAlign: 'left',
+                  fontWeight: '500',
+                  opacity: selectedRunId !== null ? 0.6 : 1
+                }}
+              >
+                + {type} Node
+              </button>
+            ))
+          )}
         </div>
       </div>
 

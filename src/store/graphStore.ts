@@ -11,6 +11,8 @@ export interface GraphStoreState {
   history: RunHistoryEntry[];
   selectedRunId: string | null;
   maxConcurrency: number;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 type Listener = (state: GraphStoreState) => void;
@@ -26,7 +28,12 @@ class GraphStore {
     history: [],
     selectedRunId: null,
     maxConcurrency: 3,
+    canUndo: false,
+    canRedo: false,
   };
+
+  private undoStack: { nodes: Node[]; edges: Edge[] }[] = [];
+  private redoStack: { nodes: Node[]; edges: Edge[] }[] = [];
 
   private draft: { nodes: Node[]; edges: Edge[]; traceSteps: TraceStep[] } | null = null;
 
@@ -47,7 +54,54 @@ class GraphStore {
     this.listeners.forEach((l) => l({ ...this.state }));
   }
 
+  saveHistoryState() {
+    this.undoStack.push({
+      nodes: JSON.parse(JSON.stringify(this.state.nodes)),
+      edges: JSON.parse(JSON.stringify(this.state.edges)),
+    });
+    this.redoStack = [];
+    this.state.canUndo = this.undoStack.length > 0;
+    this.state.canRedo = false;
+    this.emit();
+  }
+
+  undo() {
+    if (this.undoStack.length === 0) return;
+    const previous = this.undoStack.pop();
+    if (previous) {
+      this.redoStack.push({
+        nodes: JSON.parse(JSON.stringify(this.state.nodes)),
+        edges: JSON.parse(JSON.stringify(this.state.edges)),
+      });
+      this.state.nodes = previous.nodes;
+      this.state.edges = previous.edges;
+      if (this.state.selectedNodeId && !this.state.nodes.some((n) => n.id === this.state.selectedNodeId)) {
+        this.state.selectedNodeId = null;
+      }
+      this.state.canUndo = this.undoStack.length > 0;
+      this.state.canRedo = this.redoStack.length > 0;
+      this.emit();
+    }
+  }
+
+  redo() {
+    if (this.redoStack.length === 0) return;
+    const next = this.redoStack.pop();
+    if (next) {
+      this.undoStack.push({
+        nodes: JSON.parse(JSON.stringify(this.state.nodes)),
+        edges: JSON.parse(JSON.stringify(this.state.edges)),
+      });
+      this.state.nodes = next.nodes;
+      this.state.edges = next.edges;
+      this.state.canUndo = this.undoStack.length > 0;
+      this.state.canRedo = this.redoStack.length > 0;
+      this.emit();
+    }
+  }
+
   addNode(type: NodeType, position = { x: 100, y: 100 }) {
+    this.saveHistoryState();
     const id = `${type}_${Math.random().toString(36).substring(2, 9)}`;
     const newNode: Node = {
       id,
@@ -64,6 +118,7 @@ class GraphStore {
   }
 
   removeNode(nodeId: string) {
+    this.saveHistoryState();
     this.state.nodes = this.state.nodes.filter((n) => n.id !== nodeId);
     this.state.edges = this.state.edges.filter((e) => e.source !== nodeId && e.target !== nodeId);
     if (this.state.selectedNodeId === nodeId) {
@@ -102,6 +157,7 @@ class GraphStore {
     const exists = this.state.edges.some(e => e.source === source && e.target === target);
     if (exists) return null;
 
+    this.saveHistoryState();
     const id = `edge_${source}_${target}_${Math.random().toString(36).substring(2, 7)}`;
     const newEdge: Edge = { id, source, target, sourcePort, targetPort };
     this.state.edges = [...this.state.edges, newEdge];
@@ -110,11 +166,13 @@ class GraphStore {
   }
 
   removeEdge(edgeId: string) {
+    this.saveHistoryState();
     this.state.edges = this.state.edges.filter((e) => e.id !== edgeId);
     this.emit();
   }
 
   setGraph(nodes: Node[], edges: Edge[]) {
+    this.saveHistoryState();
     this.state.nodes = [...nodes];
     this.state.edges = [...edges];
     this.emit();
@@ -220,7 +278,11 @@ class GraphStore {
       history: [],
       selectedRunId: null,
       maxConcurrency: 3,
+      canUndo: false,
+      canRedo: false,
     };
+    this.undoStack = [];
+    this.redoStack = [];
     this.draft = null;
     this.emit();
   }

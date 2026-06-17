@@ -36,6 +36,7 @@ export const ConfigPanel: React.FC = () => {
   return (
     <div
       data-testid="config-panel"
+      onFocus={() => graphStore.saveHistoryState()}
       style={{
         width: '300px',
         backgroundColor: '#1f2937',
