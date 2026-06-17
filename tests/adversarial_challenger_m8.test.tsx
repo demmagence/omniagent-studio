@@ -3,13 +3,15 @@ import { graphStore } from '../src/store/graphStore';
 import { executeWorkflow } from '../src/services/executor';
 
 describe('Milestone 8: Adversarial & Stress Testing', () => {
-  const addEdgeUnsafeForTest = (source: string, target: string, id = `cycle_${Math.random()}`) => {
+  let unsafeEdgeCounter = 0;
+  const addEdgeUnsafeForTest = (source: string, target: string, id = `cycle_${++unsafeEdgeCounter}`) => {
     const unsafeEdge = { id, source, target };
     const state = graphStore.getState();
     graphStore.setGraph(state.nodes, [...state.edges, unsafeEdge]);
   };
 
   beforeEach(() => {
+    unsafeEdgeCounter = 0;
     graphStore.resetGraph();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -171,8 +173,12 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
     // The output node should have received inputs from all parallel branches
     const endStep = steps.find(s => s.nodeId === nEnd.id);
+    expect(endStep).toBeDefined();
     expect(endStep?.input).toBeDefined();
-    expect(Object.keys(endStep?.input).length).toBe(50);
+    if (!endStep || !endStep.input) {
+      throw new Error('Expected output step with defined input');
+    }
+    expect(Object.keys(endStep.input).length).toBe(50);
   });
 
   // ==========================================
