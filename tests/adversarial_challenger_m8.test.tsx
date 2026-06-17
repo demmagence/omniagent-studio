@@ -3,9 +3,15 @@ import { graphStore } from '../src/store/graphStore';
 import { executeWorkflow } from '../src/services/executor';
 
 describe('Milestone 8: Adversarial & Stress Testing', () => {
+  const DEFAULT_MOCK_DELAY_MS = 10;
+  const FAST_NODE_DELAY_MS = 10;
+  const SLOW_NODE_DELAY_MS = 50;
+
   let unsafeEdgeCounter = 0;
   const addEdgeUnsafeForTest = (source: string, target: string, id?: string) => {
-    const resolvedId = id ?? `cycle_${++unsafeEdgeCounter}`;
+    const nextCounter = unsafeEdgeCounter + 1;
+    unsafeEdgeCounter = nextCounter;
+    const resolvedId = id ?? `cycle_${nextCounter}`;
     const unsafeEdge = { id: resolvedId, source, target };
     const state = graphStore.getState();
     graphStore.setGraph(state.nodes, [...state.edges, unsafeEdge]);
@@ -16,7 +22,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     onFinish,
     content = 'parallel-result',
     totalTokens = 5,
-    delayMs = 10
+    delayMs = DEFAULT_MOCK_DELAY_MS
   }: {
     onStart?: () => void;
     onFinish?: () => void;
@@ -107,6 +113,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     graphStore.addEdge(n1.id, n2.id);
 
     let fetchAborted = false;
+    const EXECUTION_TIMEOUT_MS = 50;
+    const FETCH_DELAY_EXCEEDING_TIMEOUT_MS = 1000;
 
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
       const signal =
@@ -130,13 +138,13 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
             status: 200,
             json: async () => ({ choices: [{ message: { content: 'success' } }], usage: { total_tokens: 10 } })
           });
-        }, 1000); // Exceeds execution timeout
+        }, FETCH_DELAY_EXCEEDING_TIMEOUT_MS);
       });
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    // Run with 50ms timeout
-    const promise = executeWorkflow({ fallback: false, timeoutMs: 50 });
+    // Run with configured execution timeout
+    const promise = executeWorkflow({ fallback: false, timeoutMs: EXECUTION_TIMEOUT_MS });
     await expect(promise).rejects.toThrow(/execution timed out/);
 
     // Verify fetch abort signal was triggered
@@ -190,7 +198,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
       },
       content: 'parallel-result',
       totalTokens: 5,
-      delayMs: 10
+      delayMs: DEFAULT_MOCK_DELAY_MS
     });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -218,12 +226,12 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const n1 = graphStore.addNode('LLM');
     const n2 = graphStore.addNode('LLM');
 
-    // n1 takes 50ms, n2 takes 10ms
+    // n1 takes SLOW_NODE_DELAY_MS, n2 takes FAST_NODE_DELAY_MS
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
       const rawBody = init && typeof init.body === 'string' ? init.body : null;
       const parsedBody = rawBody ? JSON.parse(rawBody) : null;
       const prompt = parsedBody?.messages?.[parsedBody.messages.length - 1]?.content ?? 'n2';
-      const delay = prompt === 'n1' ? 50 : 10;
+      const delay = prompt === 'n1' ? SLOW_NODE_DELAY_MS : FAST_NODE_DELAY_MS;
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve({
