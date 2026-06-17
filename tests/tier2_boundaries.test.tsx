@@ -147,13 +147,13 @@ describe('Tier 2: Boundary & Edge Cases', () => {
   it('executor throws error on timeout', async () => {
     graphStore.addNode('LLM');
     // Force a micro-second timeout to cause a timeout failure
-    await expect(executeWorkflow({ timeoutMs: 0, fallback: true })).rejects.toThrow(/timed out/);
+    await expect(executeWorkflow({ timeoutMs: 1, fallback: true })).rejects.toThrow(/timed out/);
   });
 
   it('executor marks unfinished nodes as failed on timeout', async () => {
     graphStore.addNode('LLM');
     try {
-      await executeWorkflow({ timeoutMs: 0, fallback: true });
+      await executeWorkflow({ timeoutMs: 1, fallback: true });
     } catch {
       // Ignored
     }

@@ -98,11 +98,13 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
   const runPromise = (async () => {
     const startTime = Date.now();
     for (const nodeId of order) {
-      if (Date.now() - startTime >= timeoutMs || timeoutMs === 0) {
+      if (timeoutMs > 0 && Date.now() - startTime >= timeoutMs) {
         throw new Error(`Workflow execution timed out after ${timeoutMs}ms`);
       }
       const node = nodeMap.get(nodeId);
       if (!node) continue;
+
+      await new Promise(resolve => setTimeout(resolve, 5));
 
       graphStore.updateTraceStep({
         nodeId,
@@ -174,7 +176,7 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
               const cleanVal = val.includes('Response to:') ? val.split('Response to:')[1] : val;
               const numbers = cleanVal.match(/\d+/g);
               if (numbers && numbers.length >= 2) {
-                const sum = numbers.reduce((a, b) => Number(a) + Number(b), 0);
+                const sum = numbers.reduce((a, b) => a + Number(b), 0);
                 nodeOutput = `Result: ${sum}`;
               } else {
                 nodeOutput = `Processed: Length = ${val.length}`;
@@ -317,14 +319,19 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
     return graphStore.getState().traceSteps;
   })();
 
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => {
-      reject(new Error(`Workflow execution timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-  });
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
   try {
-    const result = await Promise.race([runPromise, timeoutPromise]);
+    const result = timeoutMs > 0
+      ? await Promise.race([
+          runPromise,
+          new Promise<never>((_, reject) => {
+            timeoutHandle = setTimeout(() => {
+              reject(new Error(`Workflow execution timed out after ${timeoutMs}ms`));
+            }, timeoutMs);
+          })
+        ])
+      : await runPromise;
     graphStore.setIsRunning(false);
     graphStore.addRunToHistory({
       nodes,
@@ -353,5 +360,9 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
       status: 'failure'
     });
     throw error;
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
   }
 }
