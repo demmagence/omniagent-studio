@@ -11,6 +11,37 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     graphStore.setGraph(state.nodes, [...state.edges, unsafeEdge]);
   };
 
+  const createMockFetch = ({
+    onStart,
+    onFinish,
+    content = 'parallel-result',
+    totalTokens = 5,
+    delayMs = 10
+  }: {
+    onStart?: () => void;
+    onFinish?: () => void;
+    content?: string;
+    totalTokens?: number;
+    delayMs?: number;
+  }) => {
+    return vi.fn().mockImplementation(() => {
+      onStart?.();
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          onFinish?.();
+          resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              choices: [{ message: { content } }],
+              usage: { total_tokens: totalTokens }
+            })
+          });
+        }, delayMs);
+      });
+    });
+  };
+
   beforeEach(() => {
     unsafeEdgeCounter = 0;
     graphStore.resetGraph();
@@ -78,7 +109,10 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     let fetchAborted = false;
 
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
-      const signal = init?.signal;
+      const signal =
+        init && typeof init === 'object' && 'signal' in init
+          ? init.signal
+          : undefined;
       return new Promise((resolve, reject) => {
         const onAbort = () => {
           fetchAborted = true;
@@ -146,22 +180,17 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     let currentConcurrency = 0;
     let maxObservedConcurrency = 0;
 
-    const mockFetch = vi.fn().mockImplementation(() => {
-      currentConcurrency++;
-      maxObservedConcurrency = Math.max(maxObservedConcurrency, currentConcurrency);
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          currentConcurrency--;
-          resolve({
-            ok: true,
-            status: 200,
-            json: async () => ({
-              choices: [{ message: { content: 'parallel-result' } }],
-              usage: { total_tokens: 5 }
-            })
-          });
-        }, 10);
-      });
+    const mockFetch = createMockFetch({
+      onStart: () => {
+        currentConcurrency++;
+        maxObservedConcurrency = Math.max(maxObservedConcurrency, currentConcurrency);
+      },
+      onFinish: () => {
+        currentConcurrency--;
+      },
+      content: 'parallel-result',
+      totalTokens: 5,
+      delayMs: 10
     });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -191,8 +220,9 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
     // n1 takes 50ms, n2 takes 10ms
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
-      const body = JSON.parse(init.body);
-      const prompt = body.messages[body.messages.length - 1].content;
+      const rawBody = init && typeof init.body === 'string' ? init.body : null;
+      const parsedBody = rawBody ? JSON.parse(rawBody) : null;
+      const prompt = parsedBody?.messages?.[parsedBody.messages.length - 1]?.content ?? 'n2';
       const delay = prompt === 'n1' ? 50 : 10;
       return new Promise((resolve) => {
         setTimeout(() => {
@@ -241,9 +271,25 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     graphStore.selectRun(history[0].id);
     expect(graphStore.getState().selectedRunId).toBe(history[0].id);
 
+    // Snapshot state before rejected execution attempt
+    const before = graphStore.getState();
+    const beforeNodes = before.nodes;
+    const beforeEdges = before.edges;
+    const beforeTraceSteps = before.traceSteps;
+    const beforeHistoryLength = before.history.length;
+    const beforeSelectedRunId = before.selectedRunId;
+
     // Call executeWorkflow should throw
     await expect(executeWorkflow({ fallback: true })).rejects.toThrow('Cannot execute workflow during replay');
-    
+
+    // Ensure state was not modified by failed execution attempt
+    const after = graphStore.getState();
+    expect(after.nodes).toEqual(beforeNodes);
+    expect(after.edges).toEqual(beforeEdges);
+    expect(after.traceSteps).toEqual(beforeTraceSteps);
+    expect(after.history.length).toBe(beforeHistoryLength);
+    expect(after.selectedRunId).toBe(beforeSelectedRunId);
+
     // Exit replay mode
     graphStore.selectRun(null);
   });
