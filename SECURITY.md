@@ -14,7 +14,7 @@ Only the latest release of OmniAgent Studio is actively supported with security 
 We take the security of OmniAgent Studio seriously. If you find a security vulnerability, please do **not** open a public issue on GitHub. Doing so exposes the vulnerability publicly before a fix can be prepared.
 
 Instead, please report security vulnerabilities by emailing us privately at:
-📧 **security@demmagence.com**
+📧 **demmagence@gmail.com**
 
 Please include the following details in your email:
 - **Description**: A detailed description of the vulnerability and its potential impact.
