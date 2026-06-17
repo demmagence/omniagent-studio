@@ -6,6 +6,12 @@ import { callLLM } from '../src/services/api';
 import { hasCycle, getTopologicalOrder } from '../src/utils/graphUtils';
 
 describe('Tier 2: Boundary & Edge Cases', () => {
+  const addEdgeUnsafeForTest = (source: string, target: string, id = 'cycle') => {
+    const unsafeEdge = { id, source, target };
+    const state = graphStore.getState();
+    graphStore.setGraph(state.nodes, [...state.edges, unsafeEdge]);
+  };
+
   beforeEach(() => {
     graphStore.resetGraph();
     vi.restoreAllMocks();
@@ -100,9 +106,8 @@ describe('Tier 2: Boundary & Edge Cases', () => {
     const n1 = graphStore.addNode('LLM');
     const n2 = graphStore.addNode('LLM');
     graphStore.addEdge(n1.id, n2.id);
-    // Directly add cyclical edge (the UI connection check is bypassed here by mock adding or by using setGraph)
-    const cycleEdge = { id: 'cycle', source: n2.id, target: n1.id };
-    graphStore.setGraph(graphStore.getState().nodes, [...graphStore.getState().edges, cycleEdge]);
+    // Intentionally bypass normal edge validation to construct an invalid cyclic graph for this boundary test.
+    addEdgeUnsafeForTest(n2.id, n1.id, 'cycle');
 
     await expect(executeWorkflow({ fallback: true })).rejects.toThrow(/circular dependencies/);
   });
@@ -111,8 +116,7 @@ describe('Tier 2: Boundary & Edge Cases', () => {
     const n1 = graphStore.addNode('LLM');
     const n2 = graphStore.addNode('LLM');
     graphStore.addEdge(n1.id, n2.id);
-    const cycleEdge = { id: 'cycle', source: n2.id, target: n1.id };
-    graphStore.setGraph(graphStore.getState().nodes, [...graphStore.getState().edges, cycleEdge]);
+    addEdgeUnsafeForTest(n2.id, n1.id, 'cycle');
 
     try {
       await executeWorkflow({ fallback: true });
@@ -146,20 +150,31 @@ describe('Tier 2: Boundary & Edge Cases', () => {
   // Timeout
   it('executor throws error on timeout', async () => {
     graphStore.addNode('LLM');
-    // Force a micro-second timeout to cause a timeout failure
-    await expect(executeWorkflow({ timeoutMs: 1, fallback: true })).rejects.toThrow(/timed out/);
+    vi.useFakeTimers();
+    try {
+      const run = executeWorkflow({ timeoutMs: 3, fallback: true });
+      const check = expect(run).rejects.toThrow(/timed out/);
+      await vi.advanceTimersByTimeAsync(4);
+      await check;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('executor marks unfinished nodes as failed on timeout', async () => {
     graphStore.addNode('LLM');
+    vi.useFakeTimers();
     try {
-      await executeWorkflow({ timeoutMs: 1, fallback: true });
-    } catch {
-      // Ignored
+      const run = executeWorkflow({ timeoutMs: 3, fallback: true });
+      const silentRun = run.catch(() => {});
+      await vi.advanceTimersByTimeAsync(4);
+      await silentRun;
+      const steps = graphStore.getState().traceSteps;
+      expect(steps[0].status).toBe('failed');
+      expect(steps[0].log).toMatch(/workflow execution timed out|timed out/);
+    } finally {
+      vi.useRealTimers();
     }
-    const steps = graphStore.getState().traceSteps;
-    expect(steps[0].status).toBe('failed');
-    expect(steps[0].log).toContain('timed out');
   });
 
   // API Call Errors
@@ -174,6 +189,14 @@ describe('Tier 2: Boundary & Edge Cases', () => {
 
     await expect(callLLM('openai', 'gpt-4', 'hello', { apiKey: 'bad-key', fallback: false }))
       .rejects.toThrow(/OpenAI API failed with status 401/);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('openai'),
+      expect.objectContaining({
+        method: 'POST'
+      })
+    );
   });
 
   it('Ollama fetch returns non-ok status throws error', async () => {
@@ -186,6 +209,12 @@ describe('Tier 2: Boundary & Edge Cases', () => {
 
     await expect(callLLM('ollama', 'llama-bad', 'hello', { fallback: false }))
       .rejects.toThrow(/Ollama API failed with status 500/);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object)
+    );
   });
 
   it('window.fetch throws network block error when fallback is false', async () => {
