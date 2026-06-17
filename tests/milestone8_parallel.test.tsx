@@ -87,6 +87,9 @@ describe('Milestone 8: Parallel Execution Core', () => {
     // We have 4 nodes, so no more than `maxConcurrency` may be running at once.
     const stepsDuring = graphStore.getState().traceSteps;
     const runningCount = stepsDuring.filter(s => s.status === 'running').length;
+    // Assert that the scheduler actually started work, so a missed `running`
+    // window surfaces as a meaningful assertion rather than a waitFor timeout.
+    expect(runningCount).toBeGreaterThan(0);
     expect(runningCount).toBeLessThanOrEqual(maxConcurrency);
 
     await promise;
@@ -168,6 +171,7 @@ describe('Milestone 8: Parallel Execution Core', () => {
 
     const steps = graphStore.getState().traceSteps;
     const n3Step = steps.find(s => s.nodeId === n3.id);
+    expect(n3Step).toBeDefined();
     expect(n3Step?.status).toBe('failed');
     expect(n3Step?.log).toContain('Aborted:');
   });
