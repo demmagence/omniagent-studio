@@ -4,7 +4,7 @@ import { NodeType } from '../types';
 import { serializeGraph, deserializeGraph } from '../utils/graphUtils';
 
 export const Sidebar: React.FC = () => {
-  const { nodes, edges, isFallbackMode, history, selectedRunId } = useGraphStore();
+  const { nodes, edges, isFallbackMode, history, selectedRunId, maxConcurrency } = useGraphStore();
   const [importJson, setImportJson] = React.useState('');
   const [serializedJson, setSerializedJson] = React.useState('');
 
@@ -91,15 +91,37 @@ export const Sidebar: React.FC = () => {
 
       <div>
         <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#9ca3af' }}>Execution Controls</h4>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            data-testid="fallback-mode-toggle"
-            checked={isFallbackMode}
-            onChange={handleToggleFallback}
-          />
-          Fallback / Simulation Mode
-        </label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              data-testid="fallback-mode-toggle"
+              checked={isFallbackMode}
+              onChange={handleToggleFallback}
+            />
+            Fallback / Simulation Mode
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+            <span>Max Concurrency:</span>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              data-testid="max-concurrency-input"
+              value={maxConcurrency}
+              onChange={(e) => graphStore.setMaxConcurrency(parseInt(e.target.value, 10) || 1)}
+              style={{
+                width: '50px',
+                backgroundColor: '#111827',
+                border: '1px solid #374151',
+                borderRadius: '4px',
+                color: 'white',
+                padding: '2px 6px',
+                fontSize: '12px'
+              }}
+            />
+          </label>
+        </div>
       </div>
 
       <div>

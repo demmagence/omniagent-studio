@@ -10,6 +10,7 @@ export interface GraphStoreState {
   isFallbackMode: boolean;
   history: RunHistoryEntry[];
   selectedRunId: string | null;
+  maxConcurrency: number;
 }
 
 type Listener = (state: GraphStoreState) => void;
@@ -24,6 +25,7 @@ class GraphStore {
     isFallbackMode: true,
     history: [],
     selectedRunId: null,
+    maxConcurrency: 3,
   };
 
   private draft: { nodes: Node[]; edges: Edge[]; traceSteps: TraceStep[] } | null = null;
@@ -153,6 +155,11 @@ class GraphStore {
     this.emit();
   }
 
+  setMaxConcurrency(maxConcurrency: number) {
+    this.state.maxConcurrency = maxConcurrency;
+    this.emit();
+  }
+
   addRunToHistory(run: Omit<RunHistoryEntry, 'id' | 'timestamp'>) {
     const newEntry: RunHistoryEntry = {
       id: `run_${Math.random().toString(36).substring(2, 9)}`,
@@ -212,6 +219,7 @@ class GraphStore {
       isFallbackMode: true,
       history: [],
       selectedRunId: null,
+      maxConcurrency: 3,
     };
     this.draft = null;
     this.emit();

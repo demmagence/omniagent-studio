@@ -1,10 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import { Sidebar } from '../src/components/Sidebar';
 import { graphStore } from '../src/store/graphStore';
 import { executeWorkflow } from '../src/services/executor';
 
 describe('Milestone 8: Parallel Execution Core', () => {
   beforeEach(() => {
-    graphStore.resetGraph();
+    act(() => {
+      graphStore.resetGraph();
+    });
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -171,5 +175,55 @@ describe('Milestone 8: Parallel Execution Core', () => {
     expect(maxRunning).toBe(1);
     const steps = graphStore.getState().traceSteps;
     expect(steps.every(s => s.status === 'completed')).toBe(true);
+  });
+
+  it('respects maxConcurrency from graphStore if not overridden', async () => {
+    act(() => {
+      graphStore.setMaxConcurrency(1);
+      // Add 3 independent LLM nodes
+      graphStore.addNode('LLM');
+      graphStore.addNode('LLM');
+      graphStore.addNode('LLM');
+    });
+
+    let maxRunning = 0;
+    let currentlyRunning = 0;
+
+    const mockFetch = vi.fn().mockImplementation(() => {
+      currentlyRunning++;
+      maxRunning = Math.max(maxRunning, currentlyRunning);
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          currentlyRunning--;
+          resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              choices: [{ message: { content: 'done' } }],
+              usage: { total_tokens: 5 }
+            })
+          });
+        }, 30);
+      });
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    // executeWorkflow called WITHOUT maxConcurrency option should fallback to store setting (1)
+    await executeWorkflow({ fallback: false });
+
+    expect(maxRunning).toBe(1);
+    const steps = graphStore.getState().traceSteps;
+    expect(steps.every(s => s.status === 'completed')).toBe(true);
+  });
+
+  it('renders maxConcurrency control in Sidebar and updates store state', () => {
+    render(<Sidebar />);
+
+    const maxConcurrencyInput = screen.getByTestId('max-concurrency-input') as HTMLInputElement;
+    expect(maxConcurrencyInput.value).toBe('3');
+
+    fireEvent.change(maxConcurrencyInput, { target: { value: '5' } });
+
+    expect(graphStore.getState().maxConcurrency).toBe(5);
   });
 });

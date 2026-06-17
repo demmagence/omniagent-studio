@@ -39,13 +39,13 @@ export interface ExecutionOptions {
 }
 
 export async function executeWorkflow(options: ExecutionOptions = {}): Promise<TraceStep[]> {
-  const { nodes, edges, isFallbackMode, selectedRunId } = graphStore.getState();
+  const { nodes, edges, isFallbackMode, selectedRunId, maxConcurrency: storeMaxConcurrency } = graphStore.getState();
   if (selectedRunId !== null) {
     throw new Error('Cannot execute workflow during replay');
   }
   const fallback = options.fallback !== undefined ? options.fallback : isFallbackMode;
   const timeoutMs = options.timeoutMs !== undefined ? options.timeoutMs : 30000;
-  const maxConcurrency = options.maxConcurrency !== undefined ? options.maxConcurrency : 3;
+  const maxConcurrency = options.maxConcurrency !== undefined ? options.maxConcurrency : storeMaxConcurrency;
 
   graphStore.setIsRunning(true);
   graphStore.setTraceSteps([]);

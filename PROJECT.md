@@ -51,11 +51,14 @@ c:\Users\wibis\Documents\Code\Org\star\
 | 5 | M5: Execution Tracing UI & Serialization | Live highlighting, step-by-step tracing logs, JSON import/export. | M4 | DONE |
 | 6 | M6: Premium Dashboard Theme | UI/UX visual updates, glassmorphism, animations, responsive design. | M5 | DONE |
 | 7 | M7: E2E and Adversarial Hardening | Run all E2E test tiers, perform adversarial verification & audits. | M6, E2E Test Suite | DONE |
+| 8 | M8: Parallel Execution Engine | Concurrent branch execution, max concurrency limiting, fail-fast abort. | M7 | DONE |
+| 9 | M9: Advanced Node Types | VectorDB similarity matching, JSONPath parser node. | M8 | DONE |
+| 10 | M10: Run History & Replay | Run history, visual replays, and trace-state serialization. | M9 | DONE |
 
 ## Interface Contracts
 ### Graph State (`src/types/index.ts`)
 ```typescript
-export type NodeType = 'LLM' | 'Prompt' | 'Tool' | 'Router' | 'Output';
+export type NodeType = 'LLM' | 'Prompt' | 'Tool' | 'Router' | 'Output' | 'VectorDB' | 'JSONPath';
 
 export interface NodeData {
   label: string;
@@ -70,11 +73,15 @@ export interface NodeData {
   toolName?: string;
   routingRules?: string; // Logic for router nodes
   outputVal?: string;
+  embeddingModel?: string;
+  documents?: string;
+  similarityThreshold?: number;
+  jsonPath?: string;
 }
 
 export interface Node {
   id: string;
-  type: string;
+  type: NodeType;
   position: { x: number; y: number };
   data: NodeData;
 }
@@ -102,5 +109,14 @@ export interface TraceStep {
   output: any;
   log?: string;
   tokensConsumed?: number;
+}
+
+export interface RunHistoryEntry {
+  id: string;
+  timestamp: string;
+  nodes: Node[];
+  edges: Edge[];
+  traceSteps: TraceStep[];
+  status: 'success' | 'failure';
 }
 ```

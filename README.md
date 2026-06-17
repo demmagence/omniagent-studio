@@ -12,9 +12,11 @@ OmniAgent Studio is a premium, interactive, visual workflow builder and executio
 ## Key Features 🌟
 
 *   **Interactive Node Canvas**: Drag, connect, configure, and delete nodes. Complete layout state is computed instantly.
+*   **Parallel Execution Engine**: Concurrently run independent workflow branches with custom `maxConcurrency` limits and fail-fast abort mechanics.
 *   **Multi-Provider Integration**: Direct input fields for Ollama (`localhost:11434`) and OpenAI.
 *   **Visual Execution Tracer**: See exactly where your agent chain is executing. Active nodes highlight in real-time (`pending` ➔ `running` ➔ `completed`/`failed`).
-*   **Built-in Router & Tools**: Direct support for Routing Nodes (conditional branching) and Tool Nodes (Calculator, Web Search).
+*   **Advanced Nodes**: Built-in support for Router, VectorDB (cosine similarity lookup), JSONPath extraction, and Tool nodes (Calculator, Web Search).
+*   **Execution History & Replay**: Review history logs, token usage, and status badges of past runs with a single click.
 *   **Graceful Simulator Mode**: Toggle simulated responses to test layout, logic, routing, and prompt structures without consuming API tokens or running local instances.
 *   **Flow Serialization**: Instantly export your agent graphs to a JSON file and import them back to continue editing.
 
