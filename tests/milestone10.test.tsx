@@ -105,8 +105,11 @@ describe('Milestone 10: Execution History & Replay State', () => {
 
     // Check border styling (emerald/green border color '#10b981' / box shadow)
     const nodeEl = screen.getByTestId(`node-item-${llmNodeId}`);
-    expect(nodeEl.style.border).toMatch(/(rgb\(16,\s*185,\s*129\)|#10b981)/);
-    expect(nodeEl.style.boxShadow).toMatch(/(rgb\(16,\s*185,\s*129\)|#10b981)/);
+    const normalizedBorder = nodeEl.style.border.toLowerCase().replace(/\s+/g, '');
+    const normalizedBoxShadow = nodeEl.style.boxShadow.toLowerCase().replace(/\s+/g, '');
+    const greenColorPattern = /(#10b981|rgba?\(16,185,129(?:,1)?\))/;
+    expect(normalizedBorder).toMatch(greenColorPattern);
+    expect(normalizedBoxShadow).toMatch(greenColorPattern);
 
     // Check console tokens and logs
     const totalTokensEl = screen.getByTestId('total-tokens');
