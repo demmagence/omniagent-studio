@@ -3,13 +3,15 @@ import { graphStore } from '../src/store/graphStore';
 import { executeWorkflow } from '../src/services/executor';
 
 describe('Milestone 8: Adversarial & Stress Testing', () => {
-  const addEdgeUnsafeForTest = (source: string, target: string, id = `cycle_${Math.random()}`) => {
+  let unsafeEdgeCounter = 0;
+  const addEdgeUnsafeForTest = (source: string, target: string, id = `cycle_${++unsafeEdgeCounter}`) => {
     const unsafeEdge = { id, source, target };
     const state = graphStore.getState();
     graphStore.setGraph(state.nodes, [...state.edges, unsafeEdge]);
   };
 
   beforeEach(() => {
+    unsafeEdgeCounter = 0;
     graphStore.resetGraph();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
