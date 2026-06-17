@@ -171,8 +171,12 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
     // The output node should have received inputs from all parallel branches
     const endStep = steps.find(s => s.nodeId === nEnd.id);
+    expect(endStep).toBeDefined();
     expect(endStep?.input).toBeDefined();
-    expect(Object.keys(endStep?.input).length).toBe(50);
+    if (!endStep || !endStep.input) {
+      throw new Error('Expected output step with defined input');
+    }
+    expect(Object.keys(endStep.input).length).toBe(50);
   });
 
   // ==========================================
