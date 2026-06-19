@@ -4,14 +4,13 @@ import { executeWorkflow } from '../src/services/executor';
 
 describe('Milestone 8: Adversarial & Stress Testing', () => {
   const DEFAULT_MOCK_DELAY_MS = 10;
-  const FAST_NODE_DELAY_MS = 10;
+  const FAST_NODE_DELAY_MS = DEFAULT_MOCK_DELAY_MS;
   const SLOW_NODE_DELAY_MS = 50;
 
   let unsafeEdgeCounter = 0;
   const addEdgeUnsafeForTest = (source: string, target: string, id?: string) => {
-    const nextCounter = unsafeEdgeCounter + 1;
-    unsafeEdgeCounter = nextCounter;
-    const resolvedId = id ?? `cycle_${nextCounter}`;
+    unsafeEdgeCounter += 1;
+    const resolvedId = id ?? `cycle_${unsafeEdgeCounter}`;
     const unsafeEdge = { id: resolvedId, source, target };
     const state = graphStore.getState();
     graphStore.setGraph(state.nodes, [...state.edges, unsafeEdge]);
@@ -79,7 +78,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     await expect(executeWorkflow({ fallback: true })).rejects.toThrow('Workflow contains circular dependencies / cycles.');
     
     const steps = graphStore.getState().traceSteps;
-    expect(steps.length).toBe(5);
+    const expectedStepCount = [nA, nB, nC, nD, nE].length;
+    expect(steps.length).toBe(expectedStepCount);
     expect(steps.every(s => s.status === 'failed')).toBe(true);
     expect(steps.every(s => s.log?.includes('Cycle detected in graph'))).toBe(true);
   });
@@ -99,7 +99,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     await expect(executeWorkflow({ fallback: true })).rejects.toThrow('Workflow contains circular dependencies / cycles.');
 
     const steps = graphStore.getState().traceSteps;
-    expect(steps.length).toBe(4);
+    const expectedStepCount = [nA, nB, nC, nD].length;
+    expect(steps.length).toBe(expectedStepCount);
     expect(steps.every(s => s.status === 'failed')).toBe(true);
   });
 
@@ -205,7 +206,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     // Run with maxConcurrency = 5
     const steps = await executeWorkflow({ fallback: false, maxConcurrency: 5 });
 
-    expect(steps.length).toBe(52);
+    const expectedSteps = numParallel + 2; // start + end nodes
+    expect(steps.length).toBe(expectedSteps);
     expect(steps.every(s => s.status === 'completed')).toBe(true);
     expect(maxObservedConcurrency).toBeLessThanOrEqual(5);
 
