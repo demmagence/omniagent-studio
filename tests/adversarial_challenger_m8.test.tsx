@@ -146,7 +146,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     vi.stubGlobal('fetch', mockFetch);
 
     // Run with configured execution timeout
-    const promise = promise = executeWorkflow({ fallback: false, timeoutMs: EXECUTION_TIMEOUT_MS });
+    const promise = executeWorkflow({ fallback: false, timeoutMs: EXECUTION_TIMEOUT_MS });
     await expect(promise).rejects.toThrow(/execution timed out/);
 
     // Verify fetch abort signal was triggered
