@@ -81,6 +81,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const expectedStepCount = [nA, nB, nC, nD, nE].length;
     expect(steps.length).toBe(expectedStepCount);
     expect(steps.every(s => s.status === 'failed')).toBe(true);
+    expect(steps.some(s => s.status === 'completed')).toBe(false);
     expect(steps.every(s => s.log?.includes('Cycle detected in graph'))).toBe(true);
   });
 
@@ -145,7 +146,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     vi.stubGlobal('fetch', mockFetch);
 
     // Run with configured execution timeout
-    const promise = executeWorkflow({ fallback: false, timeoutMs: EXECUTION_TIMEOUT_MS });
+    const promise = promise = executeWorkflow({ fallback: false, timeoutMs: EXECUTION_TIMEOUT_MS });
     await expect(promise).rejects.toThrow(/execution timed out/);
 
     // Verify fetch abort signal was triggered
@@ -167,7 +168,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
   // ==========================================
 
   it('runs a 52-node fan-out/fan-in workflow respecting concurrency limit', async () => {
-    // nStart fanning out to 50 parallel nodes, fanning back in to nEnd
+    // Total nodes: 1 start (nStart) + 50 parallel mid nodes + 1 end (nEnd) = 52
     const nStart = graphStore.addNode('Prompt');
     graphStore.updateNodeData(nStart.id, { promptTemplate: 'Input' });
 
@@ -210,6 +211,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     expect(steps.length).toBe(expectedSteps);
     expect(steps.every(s => s.status === 'completed')).toBe(true);
     expect(maxObservedConcurrency).toBeLessThanOrEqual(5);
+    expect(maxObservedConcurrency).toBe(5);
 
     // The output node should have received inputs from all parallel branches
     const endStep = steps.find(s => s.nodeId === nEnd.id);
@@ -302,5 +304,10 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
     // Exit replay mode
     graphStore.selectRun(null);
+    expect(graphStore.getState().selectedRunId).toBeNull();
+
+    // Verify workflow can execute again after exiting replay mode
+    await expect(executeWorkflow({ fallback: true })).resolves.toBeDefined();
+    expect(graphStore.getState().history.length).toBe(beforeHistoryLength + 1);
   });
 });
