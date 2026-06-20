@@ -5,11 +5,14 @@ import { executeWorkflow } from '../src/services/executor';
 describe('Milestone 8: Adversarial & Stress Testing', () => {
   const DEFAULT_MOCK_DELAY_MS = 10;
   const SLOW_NODE_DELAY_MS = 50;
+  const DEFAULT_PROMPT_CONTENT = 'n2';
+  const WORKFLOW_START_NODES = 1;
+  const WORKFLOW_END_NODES = 1;
 
   const extractPromptFromRequest = (init?: RequestInit): string => {
     const rawBody = init && typeof init.body === 'string' ? init.body : null;
     const parsedBody = rawBody ? JSON.parse(rawBody) : null;
-    return parsedBody?.messages?.[parsedBody.messages.length - 1]?.content ?? 'n2';
+    return parsedBody?.messages?.[parsedBody.messages.length - 1]?.content ?? DEFAULT_PROMPT_CONTENT;
   };
 
   let unsafeEdgeCounter = 0;
@@ -83,7 +86,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     await expect(executeWorkflow({ fallback: true })).rejects.toThrow('Workflow contains circular dependencies / cycles.');
     
     const steps = graphStore.getState().traceSteps;
-    const expectedStepCount = 5;
+    // Each created node should produce one trace step when execution aborts due to cycle detection.
+    const expectedStepCount = [nA, nB, nC, nD, nE].length;
     expect(steps.length).toBe(expectedStepCount);
     expect(steps.every(s => s.status === 'failed')).toBe(true);
     expect(steps.some(s => s.status === 'completed')).toBe(false);
@@ -105,7 +109,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     await expect(executeWorkflow({ fallback: true })).rejects.toThrow('Workflow contains circular dependencies / cycles.');
 
     const steps = graphStore.getState().traceSteps;
-    const expectedStepCount = 4;
+    const expectedStepCount = [nA, nB, nC, nD].length;
     expect(steps.length).toBe(expectedStepCount);
     expect(steps.every(s => s.status === 'failed')).toBe(true);
   });
@@ -209,9 +213,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     // Run with maxConcurrency = 5
     const steps = await executeWorkflow({ fallback: false, maxConcurrency: 5 });
 
-    const START_NODES = 1;
-    const END_NODES = 1;
-    const expectedSteps = numParallel + START_NODES + END_NODES;
+    const expectedSteps = numParallel + WORKFLOW_START_NODES + WORKFLOW_END_NODES;
     expect(steps.length).toBe(expectedSteps);
     expect(steps.every(s => s.status === 'completed')).toBe(true);
     expect(maxObservedConcurrency).toBeLessThanOrEqual(5);
