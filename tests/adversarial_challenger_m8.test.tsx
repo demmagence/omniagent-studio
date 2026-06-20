@@ -5,14 +5,15 @@ import { executeWorkflow } from '../src/services/executor';
 describe('Milestone 8: Adversarial & Stress Testing', () => {
   const DEFAULT_MOCK_DELAY_MS = 10;
   const SLOW_NODE_DELAY_MS = 50;
-  const DEFAULT_PROMPT_CONTENT = 'n2';
+  const FALLBACK_NODE_ID = 'n2';
   const WORKFLOW_START_NODES = 1;
   const WORKFLOW_END_NODES = 1;
+  const OUT_OF_ORDER_TEST_CONCURRENCY = 2;
 
   const extractPromptFromRequest = (init?: RequestInit): string => {
     const rawBody = init && typeof init.body === 'string' ? init.body : null;
     const parsedBody = rawBody ? JSON.parse(rawBody) : null;
-    return parsedBody?.messages?.[parsedBody.messages.length - 1]?.content ?? DEFAULT_PROMPT_CONTENT;
+    return parsedBody?.messages?.[parsedBody.messages.length - 1]?.content ?? FALLBACK_NODE_ID;
   };
 
   let unsafeEdgeCounter = 0;
@@ -236,10 +237,14 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const n1 = graphStore.addNode('LLM');
     const n2 = graphStore.addNode('LLM');
 
-    // n1 takes SLOW_NODE_DELAY_MS, n2 takes FAST_NODE_DELAY_MS
+    // Explicitly configure per-prompt delays for deterministic out-of-order completion
+    const promptDelayMs = new Map<string, number>([
+      ['n1', SLOW_NODE_DELAY_MS]
+    ]);
+
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
       const prompt = extractPromptFromRequest(init);
-      const delay = prompt === 'n1' ? SLOW_NODE_DELAY_MS : DEFAULT_MOCK_DELAY_MS;
+      const delay = promptDelayMs.get(prompt) ?? DEFAULT_MOCK_DELAY_MS;
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve({
@@ -263,7 +268,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     graphStore.updateNodeData(p2.id, { promptTemplate: 'n2' });
     graphStore.addEdge(p2.id, n2.id);
 
-    await executeWorkflow({ fallback: false, maxConcurrency: 2 });
+    await executeWorkflow({ fallback: false, maxConcurrency: OUT_OF_ORDER_TEST_CONCURRENCY });
 
     const steps = graphStore.getState().traceSteps;
     expect(steps.every(s => s.status === 'completed')).toBe(true);
