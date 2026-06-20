@@ -102,10 +102,11 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     await expect(executeWorkflow({ fallback: true })).rejects.toThrow('Workflow contains circular dependencies / cycles.');
     
     const steps = graphStore.getState().traceSteps;
-    // Each created node should produce one trace step when execution aborts due to cycle detection.
-    const NESTED_CYCLE_NODE_COUNT = 5;
-    const expectedStepCount = NESTED_CYCLE_NODE_COUNT;
-    expect(steps.length).toBe(expectedStepCount);
+    const expectedNodeIds = [nA.id, nB.id, nC.id, nD.id, nE.id];
+    const stepNodeIds = steps.map(s => s.nodeId);
+    
+    expect(stepNodeIds).toEqual(expect.arrayContaining(expectedNodeIds));
+    expect(new Set(stepNodeIds).size).toBe(stepNodeIds.length);
     expect(steps.every(s => s.status === 'failed')).toBe(true);
     expect(steps.some(s => s.status === 'completed')).toBe(false);
     expect(steps.every(s => s.log?.includes('Cycle detected in graph'))).toBe(true);
@@ -264,6 +265,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     ]);
 
     const observedPrompts: string[] = [];
+    const completionTimes = new Map<string, number>();
 
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
       const prompt = extractPromptFromRequest(init);
@@ -271,6 +273,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
       const delay = promptDelayMs.get(prompt) ?? DEFAULT_MOCK_DELAY_MS;
       return new Promise((resolve) => {
         setTimeout(() => {
+          completionTimes.set(prompt, Date.now());
           resolve({
             ok: true,
             status: 200,
@@ -301,6 +304,15 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     expect(
       observedPrompts.every(prompt => promptDelayMs.has(prompt)),
       `[${testCaseName}] Unexpected prompt(s): ${observedPrompts.filter(prompt => !promptDelayMs.has(prompt)).join(', ')}. Expected only: ${Array.from(promptDelayMs.keys()).join(', ')}`
+    ).toBe(true);
+
+    expect(
+      completionTimes.has(n1.id) && completionTimes.has(n2.id),
+      `[${testCaseName}] Missing completion timestamps. Got: ${Array.from(completionTimes.keys()).join(', ')}`
+    ).toBe(true);
+    expect(
+      (completionTimes.get(n2.id) ?? Number.POSITIVE_INFINITY) < (completionTimes.get(n1.id) ?? Number.NEGATIVE_INFINITY),
+      `[${testCaseName}] Expected ${n2.id} to complete before ${n1.id}, but got times n2=${completionTimes.get(n2.id)} n1=${completionTimes.get(n1.id)}`
     ).toBe(true);
 
     const steps = graphStore.getState().traceSteps;
