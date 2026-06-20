@@ -16,7 +16,11 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     if (rawBody) {
       try {
         parsedBody = JSON.parse(rawBody) as { messages?: Array<{ content?: string }> };
-      } catch {
+      } catch (error) {
+        console.warn('extractPromptFromRequest: failed to parse request body as JSON', {
+          error,
+          rawBody
+        });
         parsedBody = null;
       }
     }
@@ -255,17 +259,16 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     // Explicitly configure per-prompt delays for deterministic out-of-order completion.
     // IMPORTANT: extractPromptFromRequest(init) must return exactly these promptTemplate values.
     const promptDelayMs = new Map<string, number>([
-      ['n1', SLOW_NODE_DELAY_MS],
-      ['n2', DEFAULT_MOCK_DELAY_MS]
+      [n1.id, SLOW_NODE_DELAY_MS],
+      [n2.id, DEFAULT_MOCK_DELAY_MS]
     ]);
+
+    const observedPrompts: string[] = [];
 
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
       const prompt = extractPromptFromRequest(init);
-      expect(
-        promptDelayMs.has(prompt),
-        `[${testCaseName}] Unexpected prompt extracted in test mock: "${prompt}". Expected one of: ${Array.from(promptDelayMs.keys()).join(', ')}`
-      ).toBe(true);
-      const delay = promptDelayMs.get(prompt)!;
+      observedPrompts.push(prompt);
+      const delay = promptDelayMs.get(prompt) ?? DEFAULT_MOCK_DELAY_MS;
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve({
@@ -282,14 +285,23 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     vi.stubGlobal('fetch', mockFetch);
 
     const p1 = graphStore.addNode('Prompt');
-    graphStore.updateNodeData(p1.id, { promptTemplate: 'n1' });
+    graphStore.updateNodeData(p1.id, { promptTemplate: n1.id });
     graphStore.addEdge(p1.id, n1.id);
 
     const p2 = graphStore.addNode('Prompt');
-    graphStore.updateNodeData(p2.id, { promptTemplate: 'n2' });
+    graphStore.updateNodeData(p2.id, { promptTemplate: n2.id });
     graphStore.addEdge(p2.id, n2.id);
 
     await executeWorkflow({ fallback: false, maxConcurrency: OUT_OF_ORDER_TEST_CONCURRENCY });
+
+    expect(
+      observedPrompts.length,
+      `[${testCaseName}] Expected exactly 2 prompts but got ${observedPrompts.length}: ${observedPrompts.join(', ')}`
+    ).toBe(2);
+    expect(
+      observedPrompts.every(prompt => promptDelayMs.has(prompt)),
+      `[${testCaseName}] Unexpected prompt(s): ${observedPrompts.filter(prompt => !promptDelayMs.has(prompt)).join(', ')}. Expected only: ${Array.from(promptDelayMs.keys()).join(', ')}`
+    ).toBe(true);
 
     const steps = graphStore.getState().traceSteps;
     expect(steps.every(s => s.status === 'completed')).toBe(true);
@@ -297,8 +309,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const stepN1 = steps.find(s => s.nodeId === n1.id);
     const stepN2 = steps.find(s => s.nodeId === n2.id);
 
-    expect(stepN1?.output).toBe('Response to n1');
-    expect(stepN2?.output).toBe('Response to n2');
+    expect(stepN1?.output).toBe(`Response to ${n1.id}`);
+    expect(stepN2?.output).toBe(`Response to ${n2.id}`);
   });
 
   it('prevents state corruption and rejects when workflow is executed in replay mode', async () => {
