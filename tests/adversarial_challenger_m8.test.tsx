@@ -6,6 +6,12 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
   const DEFAULT_MOCK_DELAY_MS = 10;
   const SLOW_NODE_DELAY_MS = 50;
 
+  const extractPromptFromRequest = (init?: RequestInit): string => {
+    const rawBody = init && typeof init.body === 'string' ? init.body : null;
+    const parsedBody = rawBody ? JSON.parse(rawBody) : null;
+    return parsedBody?.messages?.[parsedBody.messages.length - 1]?.content ?? 'n2';
+  };
+
   let unsafeEdgeCounter = 0;
   const addEdgeUnsafeForTest = (source: string, target: string, id?: string) => {
     unsafeEdgeCounter += 1;
@@ -115,7 +121,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
     let fetchAborted = false;
     const EXECUTION_TIMEOUT_MS = 50;
-    const FETCH_DELAY_EXCEEDING_TIMEOUT_MS = 1000;
+    const FETCH_DELAY_EXCEEDING_TIMEOUT_MS = 150;
 
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
       const signal = init?.signal;
@@ -205,7 +211,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
     const START_NODES = 1;
     const END_NODES = 1;
-    const expectedSteps = numParallel + START_NODES + END_NODES; // start + end nodes
+    const expectedSteps = numParallel + START_NODES + END_NODES;
     expect(steps.length).toBe(expectedSteps);
     expect(steps.every(s => s.status === 'completed')).toBe(true);
     expect(maxObservedConcurrency).toBeLessThanOrEqual(5);
@@ -230,9 +236,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
     // n1 takes SLOW_NODE_DELAY_MS, n2 takes FAST_NODE_DELAY_MS
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
-      const rawBody = init && typeof init.body === 'string' ? init.body : null;
-      const parsedBody = rawBody ? JSON.parse(rawBody) : null;
-      const prompt = parsedBody?.messages?.[parsedBody.messages.length - 1]?.content ?? 'n2';
+      const prompt = extractPromptFromRequest(init);
       const delay = prompt === 'n1' ? SLOW_NODE_DELAY_MS : DEFAULT_MOCK_DELAY_MS;
       return new Promise((resolve) => {
         setTimeout(() => {
