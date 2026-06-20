@@ -10,7 +10,10 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
   const WORKFLOW_END_NODES = 1;
   const OUT_OF_ORDER_TEST_CONCURRENCY = 2;
 
-  const extractPromptFromRequest = (init?: RequestInit): string => {
+  const extractPromptFromRequest = (
+    init?: RequestInit,
+    fallbackPrompt: string = FALLBACK_NODE_ID
+  ): string => {
     const rawBody = init && typeof init.body === 'string' ? init.body : null;
     let parsedBody: { messages?: Array<{ content?: string }> } | null = null;
     if (rawBody) {
@@ -27,12 +30,12 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const messages = parsedBody?.messages;
 
     return Array.isArray(messages) && messages.length > 0
-      ? messages[messages.length - 1]?.content ?? FALLBACK_NODE_ID
-      : FALLBACK_NODE_ID;
+      ? messages[messages.length - 1]?.content ?? fallbackPrompt
+      : fallbackPrompt;
   };
 
   let unsafeEdgeCounter = 0;
-  const addEdgeUnsafeForTest = (source: string, target: string, id?: string) => {
+  const addEdgeWithoutCycleCheckForTest = (source: string, target: string, id?: string) => {
     unsafeEdgeCounter += 1;
     const resolvedId = id ?? `cycle_${unsafeEdgeCounter}`;
     const unsafeEdge = { id: resolvedId, source, target };
@@ -93,11 +96,11 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
     graphStore.addEdge(nA.id, nB.id);
     graphStore.addEdge(nB.id, nC.id);
-    addEdgeUnsafeForTest(nC.id, nA.id); // Cycle 1
+    addEdgeWithoutCycleCheckForTest(nC.id, nA.id); // Cycle 1
 
     graphStore.addEdge(nB.id, nD.id);
     graphStore.addEdge(nD.id, nE.id);
-    addEdgeUnsafeForTest(nE.id, nB.id); // Cycle 2
+    addEdgeWithoutCycleCheckForTest(nE.id, nB.id); // Cycle 2
 
     await expect(executeWorkflow({ fallback: true })).rejects.toThrow('Workflow contains circular dependencies / cycles.');
     
@@ -105,6 +108,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const expectedNodeIds = [nA.id, nB.id, nC.id, nD.id, nE.id];
     const stepNodeIds = steps.map(s => s.nodeId);
     
+    expect(stepNodeIds.length).toBe(expectedNodeIds.length);
     expect(stepNodeIds).toEqual(expect.arrayContaining(expectedNodeIds));
     expect(new Set(stepNodeIds).size).toBe(stepNodeIds.length);
     expect(steps.every(s => s.status === 'failed')).toBe(true);
@@ -118,7 +122,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const nA = graphStore.addNode('Prompt');
     const nB = graphStore.addNode('LLM');
     graphStore.addEdge(nA.id, nB.id);
-    addEdgeUnsafeForTest(nB.id, nA.id);
+    addEdgeWithoutCycleCheckForTest(nB.id, nA.id);
 
     const nC = graphStore.addNode('Prompt');
     const nD = graphStore.addNode('Output');
@@ -256,12 +260,13 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     // Two independent LLM nodes
     const n1 = graphStore.addNode('LLM');
     const n2 = graphStore.addNode('LLM');
+    const SLOW_PROMPT = 'out-of-order-slow-prompt';
+    const FAST_PROMPT = 'out-of-order-fast-prompt';
 
     // Explicitly configure per-prompt delays for deterministic out-of-order completion.
-    // IMPORTANT: extractPromptFromRequest(init) must return exactly these promptTemplate values.
     const promptDelayMs = new Map<string, number>([
-      [n1.id, SLOW_NODE_DELAY_MS],
-      [n2.id, DEFAULT_MOCK_DELAY_MS]
+      [SLOW_PROMPT, SLOW_NODE_DELAY_MS],
+      [FAST_PROMPT, DEFAULT_MOCK_DELAY_MS]
     ]);
 
     const observedPrompts: string[] = [];
@@ -288,11 +293,11 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     vi.stubGlobal('fetch', mockFetch);
 
     const p1 = graphStore.addNode('Prompt');
-    graphStore.updateNodeData(p1.id, { promptTemplate: n1.id });
+    graphStore.updateNodeData(p1.id, { promptTemplate: SLOW_PROMPT });
     graphStore.addEdge(p1.id, n1.id);
 
     const p2 = graphStore.addNode('Prompt');
-    graphStore.updateNodeData(p2.id, { promptTemplate: n2.id });
+    graphStore.updateNodeData(p2.id, { promptTemplate: FAST_PROMPT });
     graphStore.addEdge(p2.id, n2.id);
 
     await executeWorkflow({ fallback: false, maxConcurrency: OUT_OF_ORDER_TEST_CONCURRENCY });
@@ -307,22 +312,23 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     ).toBe(true);
 
     expect(
-      completionTimes.has(n1.id) && completionTimes.has(n2.id),
+      completionTimes.has(SLOW_PROMPT) && completionTimes.has(FAST_PROMPT),
       `[${testCaseName}] Missing completion timestamps. Got: ${Array.from(completionTimes.keys()).join(', ')}`
     ).toBe(true);
     expect(
-      (completionTimes.get(n2.id) ?? Number.POSITIVE_INFINITY) < (completionTimes.get(n1.id) ?? Number.NEGATIVE_INFINITY),
-      `[${testCaseName}] Expected ${n2.id} to complete before ${n1.id}, but got times n2=${completionTimes.get(n2.id)} n1=${completionTimes.get(n1.id)}`
+      (completionTimes.get(FAST_PROMPT) ?? Number.POSITIVE_INFINITY) < (completionTimes.get(SLOW_PROMPT) ?? Number.NEGATIVE_INFINITY),
+      `[${testCaseName}] Expected ${FAST_PROMPT} to complete before ${SLOW_PROMPT}, but got times fast=${completionTimes.get(FAST_PROMPT)} slow=${completionTimes.get(SLOW_PROMPT)}`
     ).toBe(true);
 
     const steps = graphStore.getState().traceSteps;
+    expect(steps.length).toBe(4);
     expect(steps.every(s => s.status === 'completed')).toBe(true);
 
     const stepN1 = steps.find(s => s.nodeId === n1.id);
     const stepN2 = steps.find(s => s.nodeId === n2.id);
 
-    expect(stepN1?.output).toBe(`Response to ${n1.id}`);
-    expect(stepN2?.output).toBe(`Response to ${n2.id}`);
+    expect(stepN1?.output).toBe(`Response to ${SLOW_PROMPT}`);
+    expect(stepN2?.output).toBe(`Response to ${FAST_PROMPT}`);
   });
 
   it('prevents state corruption and rejects when workflow is executed in replay mode', async () => {
