@@ -16,7 +16,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     if (rawBody) {
       try {
         parsedBody = JSON.parse(rawBody) as { messages?: Array<{ content?: string }> };
-      } catch {
+      } catch (error) {
+        console.warn('extractPromptFromRequest: failed to parse request body as JSON; using fallback prompt.', error);
         parsedBody = null;
       }
     }
@@ -144,6 +145,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
       return new Promise((resolve, reject) => {
         const onAbort = () => {
           fetchAborted = true;
+          signal?.removeEventListener('abort', onAbort);
           reject(new DOMException('The user aborted a request.', 'AbortError'));
         };
         if (signal?.aborted) {
@@ -248,7 +250,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const n1 = graphStore.addNode('LLM');
     const n2 = graphStore.addNode('LLM');
 
-    // Explicitly configure per-prompt delays for deterministic out-of-order completion
+    // Explicitly configure per-prompt delays for deterministic out-of-order completion.
+    // IMPORTANT: extractPromptFromRequest(init) must return exactly these promptTemplate values.
     const promptDelayMs = new Map<string, number>([
       ['n1', SLOW_NODE_DELAY_MS],
       ['n2', DEFAULT_MOCK_DELAY_MS]
@@ -256,7 +259,10 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
       const prompt = extractPromptFromRequest(init);
-      const delay = promptDelayMs.get(prompt) ?? DEFAULT_MOCK_DELAY_MS;
+      if (!promptDelayMs.has(prompt)) {
+        throw new Error(`Unexpected prompt extracted in test mock: "${prompt}"`);
+      }
+      const delay = promptDelayMs.get(prompt)!;
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve({
