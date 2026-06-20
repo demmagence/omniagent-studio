@@ -13,7 +13,11 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
   const extractPromptFromRequest = (init?: RequestInit): string => {
     const rawBody = init && typeof init.body === 'string' ? init.body : null;
     const parsedBody = rawBody ? JSON.parse(rawBody) : null;
-    return parsedBody?.messages?.[parsedBody.messages.length - 1]?.content ?? FALLBACK_NODE_ID;
+    const messages = parsedBody?.messages;
+
+    return Array.isArray(messages) && messages.length > 0
+      ? messages[messages.length - 1]?.content ?? FALLBACK_NODE_ID
+      : FALLBACK_NODE_ID;
   };
 
   let unsafeEdgeCounter = 0;
@@ -225,7 +229,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     expect(endStep).toBeDefined();
     const endInput = endStep?.input;
     expect(endInput).toBeDefined();
-    expect(Object.keys(endInput ?? {}).length).toBe(50);
+    expect(Object.keys(endInput ?? {}).length).toBe(numParallel);
   });
 
   // ==========================================
