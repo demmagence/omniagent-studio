@@ -16,8 +16,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     if (rawBody) {
       try {
         parsedBody = JSON.parse(rawBody) as { messages?: Array<{ content?: string }> };
-      } catch (error) {
-        console.warn('extractPromptFromRequest: failed to parse request body as JSON; using fallback prompt.', error);
+      } catch {
         parsedBody = null;
       }
     }
@@ -100,7 +99,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     
     const steps = graphStore.getState().traceSteps;
     // Each created node should produce one trace step when execution aborts due to cycle detection.
-    const expectedStepCount = [nA, nB, nC, nD, nE].length;
+    const NESTED_CYCLE_NODE_COUNT = 5;
+    const expectedStepCount = NESTED_CYCLE_NODE_COUNT;
     expect(steps.length).toBe(expectedStepCount);
     expect(steps.every(s => s.status === 'failed')).toBe(true);
     expect(steps.some(s => s.status === 'completed')).toBe(false);
@@ -122,7 +122,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     await expect(executeWorkflow({ fallback: true })).rejects.toThrow('Workflow contains circular dependencies / cycles.');
 
     const steps = graphStore.getState().traceSteps;
-    const expectedStepCount = [nA, nB, nC, nD].length;
+    const DISCONNECTED_COMPONENT_NODE_COUNT = 4;
+    const expectedStepCount = DISCONNECTED_COMPONENT_NODE_COUNT;
     expect(steps.length).toBe(expectedStepCount);
     expect(steps.every(s => s.status === 'failed')).toBe(true);
   });
@@ -246,6 +247,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
   // ==========================================
 
   it('correctly handles nodes completing in out-of-order sequence', async () => {
+    const testCaseName = 'out-of-order sequence';
     // Two independent LLM nodes
     const n1 = graphStore.addNode('LLM');
     const n2 = graphStore.addNode('LLM');
@@ -259,9 +261,10 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
       const prompt = extractPromptFromRequest(init);
-      if (!promptDelayMs.has(prompt)) {
-        throw new Error(`Unexpected prompt extracted in test mock: "${prompt}"`);
-      }
+      expect(
+        promptDelayMs.has(prompt),
+        `[${testCaseName}] Unexpected prompt extracted in test mock: "${prompt}". Expected one of: ${Array.from(promptDelayMs.keys()).join(', ')}`
+      ).toBe(true);
       const delay = promptDelayMs.get(prompt)!;
       return new Promise((resolve) => {
         setTimeout(() => {
