@@ -4,7 +4,6 @@ import { executeWorkflow } from '../src/services/executor';
 
 describe('Milestone 8: Adversarial & Stress Testing', () => {
   const DEFAULT_MOCK_DELAY_MS = 10;
-  const FAST_NODE_DELAY_MS = DEFAULT_MOCK_DELAY_MS;
   const SLOW_NODE_DELAY_MS = 50;
 
   let unsafeEdgeCounter = 0;
@@ -78,7 +77,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     await expect(executeWorkflow({ fallback: true })).rejects.toThrow('Workflow contains circular dependencies / cycles.');
     
     const steps = graphStore.getState().traceSteps;
-    const expectedStepCount = [nA, nB, nC, nD, nE].length;
+    const expectedStepCount = 5;
     expect(steps.length).toBe(expectedStepCount);
     expect(steps.every(s => s.status === 'failed')).toBe(true);
     expect(steps.some(s => s.status === 'completed')).toBe(false);
@@ -100,7 +99,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     await expect(executeWorkflow({ fallback: true })).rejects.toThrow('Workflow contains circular dependencies / cycles.');
 
     const steps = graphStore.getState().traceSteps;
-    const expectedStepCount = [nA, nB, nC, nD].length;
+    const expectedStepCount = 4;
     expect(steps.length).toBe(expectedStepCount);
     expect(steps.every(s => s.status === 'failed')).toBe(true);
   });
@@ -119,10 +118,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const FETCH_DELAY_EXCEEDING_TIMEOUT_MS = 1000;
 
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
-      const signal =
-        init && typeof init === 'object' && 'signal' in init
-          ? init.signal
-          : undefined;
+      const signal = init?.signal;
       return new Promise((resolve, reject) => {
         const onAbort = () => {
           fetchAborted = true;
@@ -207,7 +203,9 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     // Run with maxConcurrency = 5
     const steps = await executeWorkflow({ fallback: false, maxConcurrency: 5 });
 
-    const expectedSteps = numParallel + 2; // start + end nodes
+    const START_NODES = 1;
+    const END_NODES = 1;
+    const expectedSteps = numParallel + START_NODES + END_NODES; // start + end nodes
     expect(steps.length).toBe(expectedSteps);
     expect(steps.every(s => s.status === 'completed')).toBe(true);
     expect(maxObservedConcurrency).toBeLessThanOrEqual(5);
@@ -235,7 +233,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
       const rawBody = init && typeof init.body === 'string' ? init.body : null;
       const parsedBody = rawBody ? JSON.parse(rawBody) : null;
       const prompt = parsedBody?.messages?.[parsedBody.messages.length - 1]?.content ?? 'n2';
-      const delay = prompt === 'n1' ? SLOW_NODE_DELAY_MS : FAST_NODE_DELAY_MS;
+      const delay = prompt === 'n1' ? SLOW_NODE_DELAY_MS : DEFAULT_MOCK_DELAY_MS;
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve({
