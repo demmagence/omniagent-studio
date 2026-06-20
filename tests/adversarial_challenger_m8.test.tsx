@@ -12,7 +12,14 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
   const extractPromptFromRequest = (init?: RequestInit): string => {
     const rawBody = init && typeof init.body === 'string' ? init.body : null;
-    const parsedBody = rawBody ? JSON.parse(rawBody) : null;
+    let parsedBody: { messages?: Array<{ content?: string }> } | null = null;
+    if (rawBody) {
+      try {
+        parsedBody = JSON.parse(rawBody) as { messages?: Array<{ content?: string }> };
+      } catch {
+        parsedBody = null;
+      }
+    }
     const messages = parsedBody?.messages;
 
     return Array.isArray(messages) && messages.length > 0
@@ -243,7 +250,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
     // Explicitly configure per-prompt delays for deterministic out-of-order completion
     const promptDelayMs = new Map<string, number>([
-      ['n1', SLOW_NODE_DELAY_MS]
+      ['n1', SLOW_NODE_DELAY_MS],
+      ['n2', DEFAULT_MOCK_DELAY_MS]
     ]);
 
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
@@ -322,5 +330,30 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     // Verify workflow can execute again after exiting replay mode
     await expect(executeWorkflow({ fallback: true })).resolves.toBeDefined();
     expect(graphStore.getState().history.length).toBe(beforeHistoryLength + 1);
+  });
+
+  it('displays stored run trace steps correctly in replay mode', async () => {
+    const n1 = graphStore.addNode('Prompt');
+    const n2 = graphStore.addNode('Prompt');
+    graphStore.addEdge(n1.id, n2.id);
+
+    await executeWorkflow({ fallback: true });
+
+    const stateAfterRun = graphStore.getState();
+    expect(stateAfterRun.history.length).toBe(1);
+
+    const storedRun = stateAfterRun.history[0];
+    expect(storedRun.traceSteps.length).toBeGreaterThan(0);
+
+    graphStore.selectRun(storedRun.id);
+    const replayState = graphStore.getState();
+
+    expect(replayState.selectedRunId).toBe(storedRun.id);
+    expect(replayState.traceSteps).toEqual(storedRun.traceSteps);
+
+    const replayNodeIds = new Set(replayState.nodes.map(n => n.id));
+    for (const step of replayState.traceSteps) {
+      expect(replayNodeIds.has(step.nodeId)).toBe(true);
+    }
   });
 });
