@@ -14,7 +14,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
   const extractPromptFromRequest = (
     init?: RequestInit,
-    fallbackNodeId: string = FALLBACK_NODE_ID
+    fallbackValue: string = FALLBACK_NODE_ID
   ): string => {
     const rawBody = init && typeof init.body === 'string' ? init.body : null;
     let parsedBody: { messages?: Array<{ content?: string }> } | null = null;
@@ -28,8 +28,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const messages = parsedBody?.messages;
 
     return Array.isArray(messages) && messages.length > 0
-      ? messages[messages.length - 1]?.content ?? fallbackNodeId
-      : fallbackNodeId;
+      ? messages[messages.length - 1]?.content ?? fallbackValue
+      : fallbackValue;
   };
 
   const addEdgeWithoutCycleCheckForTest = (source: string, target: string, id?: string) => {
@@ -261,12 +261,18 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
       [SLOW_PROMPT, SLOW_NODE_DELAY_MS],
       [FAST_PROMPT, DEFAULT_MOCK_DELAY_MS]
     ]);
+    const validPrompts = new Set<string>([SLOW_PROMPT, FAST_PROMPT]);
 
     const observedPrompts: string[] = [];
     const completionTimes = new Map<string, number>();
 
     const mockFetch = vi.fn().mockImplementation((_url, init) => {
       const prompt = extractPromptFromRequest(init);
+      if (!validPrompts.has(prompt)) {
+        throw new Error(
+          `Unexpected prompt extracted in out-of-order test: "${prompt}". Expected one of: ${Array.from(validPrompts).join(', ')}`
+        );
+      }
       observedPrompts.push(prompt);
       const delay = promptDelayMs.get(prompt) ?? DEFAULT_MOCK_DELAY_MS;
       return new Promise((resolve) => {
@@ -313,14 +319,14 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     expect(fastCompletion).toBeDefined();
     expect(slowCompletion).toBeDefined();
 
-    const MIN_EXPECTED_GAP_MS = SLOW_NODE_DELAY_MS - DEFAULT_MOCK_DELAY_MS - TIMING_TOLERANCE_MS;
+    const MIN_EXPECTED_GAP_MS = SLOW_NODE_DELAY_MS - DEFAULT_MOCK_DELAY_MS;
     expect(
       fastCompletion! < slowCompletion!,
       `Expected ${FAST_PROMPT} to complete before ${SLOW_PROMPT}, but got times fast=${fastCompletion} slow=${slowCompletion}`
     ).toBe(true);
     expect(
-      slowCompletion! - fastCompletion! >= MIN_EXPECTED_GAP_MS,
-      `Expected completion gap to be at least ${MIN_EXPECTED_GAP_MS}ms (with tolerance), but got ${(slowCompletion! - fastCompletion!)}ms`
+      slowCompletion! - fastCompletion! >= MIN_EXPECTED_GAP_MS - TIMING_TOLERANCE_MS,
+      `Expected completion gap to be at least ${MIN_EXPECTED_GAP_MS}ms (allowing ${TIMING_TOLERANCE_MS}ms tolerance), but got ${(slowCompletion! - fastCompletion!)}ms`
     ).toBe(true);
 
     const steps = graphStore.getState().traceSteps;
