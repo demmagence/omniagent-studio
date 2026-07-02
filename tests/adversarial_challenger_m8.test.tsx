@@ -5,6 +5,8 @@ import { executeWorkflow } from '../src/services/executor';
 describe('Milestone 8: Adversarial & Stress Testing', () => {
   const DEFAULT_MOCK_DELAY_MS = 10;
   const SLOW_NODE_DELAY_MS = 50;
+  // Allows minor timing jitter from event loop scheduling and test runner overhead.
+  const TIMING_TOLERANCE_MS = 5;
   const FALLBACK_NODE_ID = 'n2';
   const WORKFLOW_START_NODES = 1;
   const WORKFLOW_END_NODES = 1;
@@ -19,11 +21,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     if (rawBody) {
       try {
         parsedBody = JSON.parse(rawBody) as { messages?: Array<{ content?: string }> };
-      } catch (error) {
-        console.warn('extractPromptFromRequest: failed to parse request body as JSON', {
-          error,
-          rawBody
-        });
+      } catch {
         parsedBody = null;
       }
     }
@@ -104,9 +102,11 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const steps = graphStore.getState().traceSteps;
     const expectedNodeIds = [nA.id, nB.id, nC.id, nD.id, nE.id];
     const stepNodeIds = steps.map(s => s.nodeId);
+    const startedExecutionStatuses = ['running'];
     
     expect([...stepNodeIds].sort()).toEqual([...expectedNodeIds].sort());
     expect(steps.every(s => s.status === 'failed')).toBe(true);
+    expect(steps.some(s => startedExecutionStatuses.includes(s.status))).toBe(false);
     expect(steps.some(s => s.status === 'completed')).toBe(false);
     expect(steps.every(s => s.log?.includes('Cycle detected in graph'))).toBe(true);
   });
@@ -250,7 +250,6 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
   // ==========================================
 
   it('correctly handles nodes completing in out-of-order sequence', async () => {
-    const testCaseName = 'out-of-order sequence';
     // Two independent LLM nodes
     const n1 = graphStore.addNode('LLM');
     const n2 = graphStore.addNode('LLM');
@@ -298,30 +297,30 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
     expect(
       observedPrompts.length,
-      `[${testCaseName}] Expected exactly 2 prompts but got ${observedPrompts.length}: ${observedPrompts.join(', ')}`
+      `Expected exactly 2 prompts but got ${observedPrompts.length}: ${observedPrompts.join(', ')}`
     ).toBe(2);
     expect(
       observedPrompts.every(prompt => promptDelayMs.has(prompt)),
-      `[${testCaseName}] Unexpected prompt(s): ${observedPrompts.filter(prompt => !promptDelayMs.has(prompt)).join(', ')}. Expected only: ${Array.from(promptDelayMs.keys()).join(', ')}`
+      `Unexpected prompt(s): ${observedPrompts.filter(prompt => !promptDelayMs.has(prompt)).join(', ')}. Expected only: ${Array.from(promptDelayMs.keys()).join(', ')}`
     ).toBe(true);
 
     expect(
       completionTimes.has(SLOW_PROMPT) && completionTimes.has(FAST_PROMPT),
-      `[${testCaseName}] Missing completion timestamps. Got: ${Array.from(completionTimes.keys()).join(', ')}`
+      `Missing completion timestamps. Got: ${Array.from(completionTimes.keys()).join(', ')}`
     ).toBe(true);
     const fastCompletion = completionTimes.get(FAST_PROMPT);
     const slowCompletion = completionTimes.get(SLOW_PROMPT);
     expect(fastCompletion).toBeDefined();
     expect(slowCompletion).toBeDefined();
 
-    const MIN_EXPECTED_GAP_MS = SLOW_NODE_DELAY_MS - DEFAULT_MOCK_DELAY_MS - 5;
+    const MIN_EXPECTED_GAP_MS = SLOW_NODE_DELAY_MS - DEFAULT_MOCK_DELAY_MS - TIMING_TOLERANCE_MS;
     expect(
       fastCompletion! < slowCompletion!,
-      `[${testCaseName}] Expected ${FAST_PROMPT} to complete before ${SLOW_PROMPT}, but got times fast=${fastCompletion} slow=${slowCompletion}`
+      `Expected ${FAST_PROMPT} to complete before ${SLOW_PROMPT}, but got times fast=${fastCompletion} slow=${slowCompletion}`
     ).toBe(true);
     expect(
       slowCompletion! - fastCompletion! >= MIN_EXPECTED_GAP_MS,
-      `[${testCaseName}] Expected completion gap to be at least ${MIN_EXPECTED_GAP_MS}ms (with tolerance), but got ${(slowCompletion! - fastCompletion!)}ms`
+      `Expected completion gap to be at least ${MIN_EXPECTED_GAP_MS}ms (with tolerance), but got ${(slowCompletion! - fastCompletion!)}ms`
     ).toBe(true);
 
     const steps = graphStore.getState().traceSteps;
