@@ -108,9 +108,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const expectedNodeIds = [nA.id, nB.id, nC.id, nD.id, nE.id];
     const stepNodeIds = steps.map(s => s.nodeId);
     
-    expect(stepNodeIds.length).toBe(expectedNodeIds.length);
-    expect(stepNodeIds).toEqual(expect.arrayContaining(expectedNodeIds));
-    expect(new Set(stepNodeIds).size).toBe(stepNodeIds.length);
+    expect([...stepNodeIds].sort()).toEqual([...expectedNodeIds].sort());
     expect(steps.every(s => s.status === 'failed')).toBe(true);
     expect(steps.some(s => s.status === 'completed')).toBe(false);
     expect(steps.every(s => s.log?.includes('Cycle detected in graph'))).toBe(true);
@@ -316,7 +314,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
       `[${testCaseName}] Missing completion timestamps. Got: ${Array.from(completionTimes.keys()).join(', ')}`
     ).toBe(true);
     expect(
-      (completionTimes.get(FAST_PROMPT) ?? Number.POSITIVE_INFINITY) < (completionTimes.get(SLOW_PROMPT) ?? Number.NEGATIVE_INFINITY),
+      completionTimes.get(FAST_PROMPT)! < completionTimes.get(SLOW_PROMPT)!,
       `[${testCaseName}] Expected ${FAST_PROMPT} to complete before ${SLOW_PROMPT}, but got times fast=${completionTimes.get(FAST_PROMPT)} slow=${completionTimes.get(SLOW_PROMPT)}`
     ).toBe(true);
 
