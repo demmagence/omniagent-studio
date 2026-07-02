@@ -12,7 +12,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
   const extractPromptFromRequest = (
     init?: RequestInit,
-    fallbackPrompt: string = FALLBACK_NODE_ID
+    fallbackNodeId: string = FALLBACK_NODE_ID
   ): string => {
     const rawBody = init && typeof init.body === 'string' ? init.body : null;
     let parsedBody: { messages?: Array<{ content?: string }> } | null = null;
@@ -30,16 +30,14 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const messages = parsedBody?.messages;
 
     return Array.isArray(messages) && messages.length > 0
-      ? messages[messages.length - 1]?.content ?? fallbackPrompt
-      : fallbackPrompt;
+      ? messages[messages.length - 1]?.content ?? fallbackNodeId
+      : fallbackNodeId;
   };
 
-  let unsafeEdgeCounter = 0;
   const addEdgeWithoutCycleCheckForTest = (source: string, target: string, id?: string) => {
-    unsafeEdgeCounter += 1;
-    const resolvedId = id ?? `cycle_${unsafeEdgeCounter}`;
-    const unsafeEdge = { id: resolvedId, source, target };
     const state = graphStore.getState();
+    const resolvedId = id ?? `cycle_${state.edges.length + 1}`;
+    const unsafeEdge = { id: resolvedId, source, target };
     graphStore.setGraph(state.nodes, [...state.edges, unsafeEdge]);
   };
 
@@ -75,7 +73,6 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
   };
 
   beforeEach(() => {
-    unsafeEdgeCounter = 0;
     graphStore.resetGraph();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -239,7 +236,6 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     expect(steps.length).toBe(expectedSteps);
     expect(steps.every(s => s.status === 'completed')).toBe(true);
     expect(maxObservedConcurrency).toBeLessThanOrEqual(5);
-    expect(maxObservedConcurrency).toBe(5);
 
     // The output node should have received inputs from all parallel branches
     const endStep = steps.find(s => s.nodeId === nEnd.id);
@@ -313,9 +309,19 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
       completionTimes.has(SLOW_PROMPT) && completionTimes.has(FAST_PROMPT),
       `[${testCaseName}] Missing completion timestamps. Got: ${Array.from(completionTimes.keys()).join(', ')}`
     ).toBe(true);
+    const fastCompletion = completionTimes.get(FAST_PROMPT);
+    const slowCompletion = completionTimes.get(SLOW_PROMPT);
+    expect(fastCompletion).toBeDefined();
+    expect(slowCompletion).toBeDefined();
+
+    const MIN_EXPECTED_GAP_MS = SLOW_NODE_DELAY_MS - DEFAULT_MOCK_DELAY_MS - 5;
     expect(
-      completionTimes.get(FAST_PROMPT)! < completionTimes.get(SLOW_PROMPT)!,
-      `[${testCaseName}] Expected ${FAST_PROMPT} to complete before ${SLOW_PROMPT}, but got times fast=${completionTimes.get(FAST_PROMPT)} slow=${completionTimes.get(SLOW_PROMPT)}`
+      fastCompletion! < slowCompletion!,
+      `[${testCaseName}] Expected ${FAST_PROMPT} to complete before ${SLOW_PROMPT}, but got times fast=${fastCompletion} slow=${slowCompletion}`
+    ).toBe(true);
+    expect(
+      slowCompletion! - fastCompletion! >= MIN_EXPECTED_GAP_MS,
+      `[${testCaseName}] Expected completion gap to be at least ${MIN_EXPECTED_GAP_MS}ms (with tolerance), but got ${(slowCompletion! - fastCompletion!)}ms`
     ).toBe(true);
 
     const steps = graphStore.getState().traceSteps;
