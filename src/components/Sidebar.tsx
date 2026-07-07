@@ -78,7 +78,14 @@ export const Sidebar: React.FC = () => {
         gap: '16px'
       }}
     >
-      <h3 style={{ margin: 0 }}>OmniAgent Studio</h3>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <img
+          src="/logo.png"
+          alt="OmniAgent Studio Logo"
+          style={{ width: '36px', height: '36px', objectFit: 'contain', flexShrink: 0 }}
+        />
+        <h3 style={{ margin: 0, fontSize: '15px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>OmniAgent Studio</h3>
+      </div>
       {selectedRunId !== null && (
         <div style={{ padding: '6px', backgroundColor: '#b45309', borderRadius: '4px', fontSize: '11px', textAlign: 'center', fontWeight: 'bold' }}>
           Replay Mode Active
