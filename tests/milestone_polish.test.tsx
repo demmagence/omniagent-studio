@@ -2,6 +2,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import App from '../src/App';
 import { graphStore } from '../src/store/graphStore';
+import { Node } from '../src/types';
 
 describe('Milestone Polish: Auto Layout, Keyboard Shortcuts, and Stats Console', () => {
   beforeEach(() => {
@@ -12,10 +13,14 @@ describe('Milestone Polish: Auto Layout, Keyboard Shortcuts, and Stats Console',
 
   it('triggers auto layout and updates node positions', () => {
     render(<App />);
-    let nodeA: { id: string } | undefined, nodeB: { id: string } | undefined;
+    let nodeA: Node | undefined;
+    let nodeB: Node | undefined;
     act(() => {
       nodeA = graphStore.addNode('LLM', { x: 50, y: 50 });
       nodeB = graphStore.addNode('Output', { x: 50, y: 50 });
+      if (!nodeA || !nodeB) {
+        throw new Error('Expected nodes to be created before linking');
+      }
       graphStore.addEdge(nodeA.id, nodeB.id);
     });
 
@@ -52,9 +57,10 @@ describe('Milestone Polish: Auto Layout, Keyboard Shortcuts, and Stats Console',
 
   it('handles Escape to deselect, and Delete/Backspace to delete selected node', () => {
     render(<App />);
-    let node: ReturnType<typeof graphStore.addNode> | undefined;
+    let node: Node | undefined;
     act(() => {
       node = graphStore.addNode('LLM');
+      if (!node) throw new Error('Node should be created');
       graphStore.selectNode(node.id);
     });
 
@@ -75,9 +81,10 @@ describe('Milestone Polish: Auto Layout, Keyboard Shortcuts, and Stats Console',
     expect(graphStore.getState().nodes.find((n) => n.id === node!.id)).toBeUndefined();
 
     // Add another node and select it
-    let node2: ReturnType<typeof graphStore.addNode> | undefined;
+    let node2: Node | undefined;
     act(() => {
       node2 = graphStore.addNode('Prompt');
+      if (!node2) throw new Error('Node 2 should be created');
       graphStore.selectNode(node2.id);
     });
     expect(graphStore.getState().nodes.find((n) => n.id === node2!.id)).toBeDefined();
@@ -89,9 +96,10 @@ describe('Milestone Polish: Auto Layout, Keyboard Shortcuts, and Stats Console',
 
   it('does not remove selected node if user is typing in input or textarea', () => {
     render(<App />);
-    let node: ReturnType<typeof graphStore.addNode> | undefined;
+    let node: Node | undefined;
     act(() => {
       node = graphStore.addNode('LLM');
+      if (!node) throw new Error('Node should be created');
       graphStore.selectNode(node.id);
     });
 
