@@ -122,7 +122,6 @@ export const Sidebar: React.FC = () => {
             return (
               <button
                 key={cat}
-                data-testid={`category-tab-${cat.replace(/\s+/g, '-')}`}
                 onClick={() => setSelectedCategory(cat)}
                 style={{
                   padding: '3px 6px',

@@ -2,6 +2,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import App from '../src/App';
 import { graphStore } from '../src/store/graphStore';
+import { Node } from '../src/types';
 
 describe('Milestone Polish: Auto Layout, Keyboard Shortcuts, and Stats Console', () => {
   beforeEach(() => {
@@ -12,10 +13,14 @@ describe('Milestone Polish: Auto Layout, Keyboard Shortcuts, and Stats Console',
 
   it('triggers auto layout and updates node positions', () => {
     render(<App />);
-    let nodeA: any, nodeB: any;
+    let nodeA: Node | undefined;
+    let nodeB: Node | undefined;
     act(() => {
       nodeA = graphStore.addNode('LLM', { x: 50, y: 50 });
       nodeB = graphStore.addNode('Output', { x: 50, y: 50 });
+      if (!nodeA || !nodeB) {
+        throw new Error('Expected nodes to be created before linking');
+      }
       graphStore.addEdge(nodeA.id, nodeB.id);
     });
 
@@ -26,8 +31,8 @@ describe('Milestone Polish: Auto Layout, Keyboard Shortcuts, and Stats Console',
     fireEvent.click(layoutBtn);
 
     const state = graphStore.getState();
-    const updatedA = state.nodes.find((n) => n.id === nodeA.id);
-    const updatedB = state.nodes.find((n) => n.id === nodeB.id);
+    const updatedA = state.nodes.find((n) => n.id === nodeA!.id);
+    const updatedB = state.nodes.find((n) => n.id === nodeB!.id);
 
     // Nodes should have been repositioned to different X coordinates because of layers
     expect(updatedA?.position.x).not.toBe(50);
@@ -52,13 +57,14 @@ describe('Milestone Polish: Auto Layout, Keyboard Shortcuts, and Stats Console',
 
   it('handles Escape to deselect, and Delete/Backspace to delete selected node', () => {
     render(<App />);
-    let node: any;
+    let node: Node | undefined;
     act(() => {
       node = graphStore.addNode('LLM');
+      if (!node) throw new Error('Node should be created');
       graphStore.selectNode(node.id);
     });
 
-    expect(graphStore.getState().selectedNodeId).toBe(node.id);
+    expect(graphStore.getState().selectedNodeId).toBe(node!.id);
 
     // Escape deselects
     fireEvent.keyDown(window, { key: 'Escape' });
@@ -66,32 +72,34 @@ describe('Milestone Polish: Auto Layout, Keyboard Shortcuts, and Stats Console',
 
     // Select again
     act(() => {
-      graphStore.selectNode(node.id);
+      graphStore.selectNode(node!.id);
     });
-    expect(graphStore.getState().selectedNodeId).toBe(node.id);
+    expect(graphStore.getState().selectedNodeId).toBe(node!.id);
 
     // Delete removes node
     fireEvent.keyDown(window, { key: 'Delete' });
-    expect(graphStore.getState().nodes.find((n) => n.id === node.id)).toBeUndefined();
+    expect(graphStore.getState().nodes.find((n) => n.id === node!.id)).toBeUndefined();
 
     // Add another node and select it
-    let node2: any;
+    let node2: Node | undefined;
     act(() => {
       node2 = graphStore.addNode('Prompt');
+      if (!node2) throw new Error('Node 2 should be created');
       graphStore.selectNode(node2.id);
     });
-    expect(graphStore.getState().nodes.find((n) => n.id === node2.id)).toBeDefined();
+    expect(graphStore.getState().nodes.find((n) => n.id === node2!.id)).toBeDefined();
 
     // Backspace removes node too
     fireEvent.keyDown(window, { key: 'Backspace' });
-    expect(graphStore.getState().nodes.find((n) => n.id === node2.id)).toBeUndefined();
+    expect(graphStore.getState().nodes.find((n) => n.id === node2!.id)).toBeUndefined();
   });
 
   it('does not remove selected node if user is typing in input or textarea', () => {
     render(<App />);
-    let node: any;
+    let node: Node | undefined;
     act(() => {
       node = graphStore.addNode('LLM');
+      if (!node) throw new Error('Node should be created');
       graphStore.selectNode(node.id);
     });
 
@@ -102,7 +110,7 @@ describe('Milestone Polish: Auto Layout, Keyboard Shortcuts, and Stats Console',
 
     fireEvent.keyDown(input, { key: 'Delete' });
     // Node should still exist
-    expect(graphStore.getState().nodes.find((n) => n.id === node.id)).toBeDefined();
+    expect(graphStore.getState().nodes.find((n) => n.id === node!.id)).toBeDefined();
 
     // Cleanup
     document.body.removeChild(input);
