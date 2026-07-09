@@ -215,7 +215,11 @@ export const Sidebar: React.FC = () => {
               max="10"
               data-testid="max-concurrency-input"
               value={maxConcurrency}
-              onChange={(e) => graphStore.setMaxConcurrency(parseInt(e.target.value, 10) || 1)}
+              onChange={(e) => {
+                const parsed = parseInt(e.target.value, 10) || 1;
+                const clamped = Math.min(10, Math.max(1, parsed));
+                graphStore.setMaxConcurrency(clamped);
+              }}
               style={{
                 width: '50px',
                 backgroundColor: '#111827',

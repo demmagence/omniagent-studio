@@ -214,7 +214,7 @@ class GraphStore {
   }
 
   setMaxConcurrency(maxConcurrency: number) {
-    this.state.maxConcurrency = maxConcurrency;
+    this.state.maxConcurrency = Math.min(10, Math.max(1, maxConcurrency));
     this.emit();
   }
 
