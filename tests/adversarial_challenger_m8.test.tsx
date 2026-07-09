@@ -14,7 +14,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
   const extractPromptFromRequest = (
     init?: RequestInit,
-    fallbackValue: string = FALLBACK_NODE_ID
+    defaultNodeId: string = FALLBACK_NODE_ID
   ): string => {
     const rawBody = init && typeof init.body === 'string' ? init.body : null;
     let parsedBody: { messages?: Array<{ content?: string }> } | null = null;
@@ -28,8 +28,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const messages = parsedBody?.messages;
 
     return Array.isArray(messages) && messages.length > 0
-      ? messages[messages.length - 1]?.content ?? fallbackValue
-      : fallbackValue;
+      ? messages[messages.length - 1]?.content ?? defaultNodeId
+      : defaultNodeId;
   };
 
   const addEdgeWithoutCycleCheckForTest = (source: string, target: string, id?: string) => {
@@ -42,28 +42,48 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
   const createMockFetch = ({
     onStart,
     onFinish,
+    onAbort,
     content = 'parallel-result',
     totalTokens = 5,
-    delayMs = DEFAULT_MOCK_DELAY_MS
+    delayMs = DEFAULT_MOCK_DELAY_MS,
+    response
   }: {
     onStart?: () => void;
     onFinish?: () => void;
+    onAbort?: () => void;
     content?: string;
     totalTokens?: number;
     delayMs?: number;
+    response?: any;
   }) => {
-    return vi.fn().mockImplementation(() => {
+    return vi.fn().mockImplementation((_url, init) => {
       onStart?.();
-      return new Promise((resolve) => {
+      const signal = init?.signal;
+      return new Promise((resolve, reject) => {
+        const _onAbort = () => {
+          onAbort?.();
+          signal?.removeEventListener('abort', _onAbort);
+          reject(new DOMException('The user aborted a request.', 'AbortError'));
+        };
+
+        if (signal?.aborted) {
+          _onAbort();
+          return;
+        }
+
+        signal?.addEventListener('abort', _onAbort);
+
         setTimeout(() => {
           onFinish?.();
+          signal?.removeEventListener('abort', _onAbort);
           resolve({
             ok: true,
             status: 200,
-            json: async () => ({
-              choices: [{ message: { content } }],
-              usage: { total_tokens: totalTokens }
-            })
+            json: async () =>
+              response ?? {
+                choices: [{ message: { content } }],
+                usage: { total_tokens: totalTokens }
+              }
           });
         }, delayMs);
       });
@@ -145,28 +165,12 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     const EXECUTION_TIMEOUT_MS = 50;
     const FETCH_DELAY_EXCEEDING_TIMEOUT_MS = 150;
 
-    const mockFetch = vi.fn().mockImplementation((_url, init) => {
-      const signal = init?.signal;
-      return new Promise((resolve, reject) => {
-        const onAbort = () => {
-          fetchAborted = true;
-          signal?.removeEventListener('abort', onAbort);
-          reject(new DOMException('The user aborted a request.', 'AbortError'));
-        };
-        if (signal?.aborted) {
-          onAbort();
-          return;
-        }
-        signal?.addEventListener('abort', onAbort);
-        setTimeout(() => {
-          signal?.removeEventListener('abort', onAbort);
-          resolve({
-            ok: true,
-            status: 200,
-            json: async () => ({ choices: [{ message: { content: 'success' } }], usage: { total_tokens: 10 } })
-          });
-        }, FETCH_DELAY_EXCEEDING_TIMEOUT_MS);
-      });
+    const mockFetch = createMockFetch({
+      delayMs: FETCH_DELAY_EXCEEDING_TIMEOUT_MS,
+      response: { choices: [{ message: { content: 'success' } }], usage: { total_tokens: 10 } },
+      onAbort: () => {
+        fetchAborted = true;
+      }
     });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -199,6 +203,8 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
 
     const midNodes = [];
     const numParallel = 50;
+    const MAX_CONCURRENCY_LIMIT = 5;
+
     for (let i = 0; i < numParallel; i++) {
       const n = graphStore.addNode('LLM');
       graphStore.updateNodeData(n.id, { provider: 'openai', model: 'gpt-4o', label: `LLM Node ${i}` });
@@ -229,13 +235,13 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    // Run with maxConcurrency = 5
-    const steps = await executeWorkflow({ fallback: false, maxConcurrency: 5 });
+    // Run with maxConcurrency = MAX_CONCURRENCY_LIMIT
+    const steps = await executeWorkflow({ fallback: false, maxConcurrency: MAX_CONCURRENCY_LIMIT });
 
     const expectedSteps = numParallel + WORKFLOW_START_NODES + WORKFLOW_END_NODES;
     expect(steps.length).toBe(expectedSteps);
     expect(steps.every(s => s.status === 'completed')).toBe(true);
-    expect(maxObservedConcurrency).toBeLessThanOrEqual(5);
+    expect(maxObservedConcurrency).toBeLessThanOrEqual(MAX_CONCURRENCY_LIMIT);
 
     // The output node should have received inputs from all parallel branches
     const endStep = steps.find(s => s.nodeId === nEnd.id);
@@ -261,7 +267,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
       [SLOW_PROMPT, SLOW_NODE_DELAY_MS],
       [FAST_PROMPT, DEFAULT_MOCK_DELAY_MS]
     ]);
-    const validPrompts = new Set<string>([SLOW_PROMPT, FAST_PROMPT]);
+    const validPrompts = new Set<string>(promptDelayMs.keys());
 
     const observedPrompts: string[] = [];
     const completionTimes = new Map<string, number>();
@@ -353,12 +359,14 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
     expect(graphStore.getState().selectedRunId).toBe(history[0].id);
 
     // Snapshot state before rejected execution attempt
-    const before = graphStore.getState();
-    const beforeNodes = before.nodes;
-    const beforeEdges = before.edges;
-    const beforeTraceSteps = before.traceSteps;
-    const beforeHistoryLength = before.history.length;
-    const beforeSelectedRunId = before.selectedRunId;
+    const {
+      nodes: beforeNodes,
+      edges: beforeEdges,
+      traceSteps: beforeTraceSteps,
+      history: beforeHistory,
+      selectedRunId: beforeSelectedRunId
+    } = graphStore.getState();
+    const beforeHistoryLength = beforeHistory.length;
 
     // Call executeWorkflow should throw
     await expect(executeWorkflow({ fallback: true })).rejects.toThrow('Cannot execute workflow during replay');
