@@ -44,7 +44,7 @@ async function waitFor(
 // `messages` array, so a malformed call (missing init/body, non-JSON body, or
 // unexpected shape) fails with a clear assertion instead of an opaque
 // "Cannot read properties of undefined" thrown deep inside the mock.
-function parseFetchRequest(url: unknown, init: RequestInit | undefined): { prompt: string } {
+function parseFetchRequest(url: unknown, init: RequestInit | undefined): { prompt: string, signal?: AbortSignal | null } {
   expect(init).toBeDefined();
   expect(typeof url === 'string' || url instanceof URL).toBe(true);
   expect(init!.method).toBe('POST');
@@ -54,9 +54,15 @@ function parseFetchRequest(url: unknown, init: RequestInit | undefined): { promp
   expect(Array.isArray(body.messages)).toBe(true);
   expect(body.messages.length).toBeGreaterThan(0);
 
-  const prompt = body.messages[body.messages.length - 1].content;
+  const lastMessage = body.messages[body.messages.length - 1];
+  expect(lastMessage).toBeDefined();
+  expect(lastMessage).not.toBeNull();
+  expect(typeof lastMessage).toBe('object');
+  expect('content' in (lastMessage as Record<string, unknown>)).toBe(true);
+
+  const prompt = (lastMessage as { content: unknown }).content;
   expect(typeof prompt).toBe('string');
-  return { prompt };
+  return { prompt, signal: init!.signal };
 }
 
 // Build a mocked `fetch` that validates each request (via parseFetchRequest)
@@ -151,9 +157,8 @@ describe('Milestone 8: Parallel Execution Core', () => {
     const startedPrompts = new Set<string>();
 
     const mockFetch = vi.fn().mockImplementation((url, init) => {
-      const { prompt } = parseFetchRequest(url, init);
+      const { prompt, signal } = parseFetchRequest(url, init);
       startedPrompts.add(prompt);
-      const signal = init.signal;
       // The executor must wire an AbortSignal so fail-fast abort can interrupt
       // in-flight requests; assert it here so a regression that drops the signal
       // (silently skipping the abort path) is caught instead of passing quietly.
