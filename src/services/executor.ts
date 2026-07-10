@@ -12,7 +12,7 @@ export function getWordFrequency(text: string): Map<string, number> {
   return freq;
 }
 
-function calculateCosineSimilarity(freq1: Map<string, number>, freq2: Map<string, number>): number {
+export function calculateCosineSimilarity(freq1: Map<string, number>, freq2: Map<string, number>): number {
   let dotProduct = 0;
   let norm1 = 0;
   let norm2 = 0;
