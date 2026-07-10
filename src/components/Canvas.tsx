@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useGraphStore, graphStore } from '../store/graphStore';
 import { Node } from './Node';
 
 export const Canvas: React.FC = () => {
   const { nodes, edges, selectedNodeId, selectedRunId, canUndo, canRedo, traceSteps } = useGraphStore();
+  const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
+  const traceMap = useMemo(() => new Map(traceSteps.map(t => [t.nodeId, t])), [traceSteps]);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [activeConnection, setActiveConnection] = useState<{
@@ -150,7 +152,7 @@ export const Canvas: React.FC = () => {
 
     const initialMouseX = e.clientX;
     const initialMouseY = e.clientY;
-    const targetNode = nodes.find(n => n.id === nodeId);
+    const targetNode = nodeMap.get(nodeId);
     if (!targetNode) return;
     const initialNodeX = targetNode.position.x;
     const initialNodeY = targetNode.position.y;
@@ -527,8 +529,8 @@ export const Canvas: React.FC = () => {
           }}
         >
           {edges.map((edge) => {
-            const srcNode = nodes.find(n => n.id === edge.source);
-            const tgtNode = nodes.find(n => n.id === edge.target);
+            const srcNode = nodeMap.get(edge.source);
+            const tgtNode = nodeMap.get(edge.target);
             if (!srcNode || !tgtNode) return null;
 
             const x1 = srcNode.position.x + 200;
@@ -536,7 +538,7 @@ export const Canvas: React.FC = () => {
             const x2 = tgtNode.position.x;
             const y2 = tgtNode.position.y + 60;
 
-            const trace = traceSteps.find((s) => s.nodeId === srcNode.id);
+            const trace = traceMap.get(srcNode.id);
             const status = trace ? trace.status : null;
 
             let strokeColor = '#4b5563';
@@ -574,7 +576,7 @@ export const Canvas: React.FC = () => {
           })}
 
           {activeConnection && (() => {
-            const srcNode = nodes.find(n => n.id === activeConnection.nodeId);
+            const srcNode = nodeMap.get(activeConnection.nodeId);
             if (!srcNode) return null;
 
             let x1, y1, x2, y2;
@@ -635,8 +637,8 @@ export const Canvas: React.FC = () => {
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {edges.map((edge) => {
-              const srcNode = nodes.find(n => n.id === edge.source);
-              const tgtNode = nodes.find(n => n.id === edge.target);
+              const srcNode = nodeMap.get(edge.source);
+              const tgtNode = nodeMap.get(edge.target);
               const srcLabel = srcNode?.data.label || edge.source;
               const tgtLabel = tgtNode?.data.label || edge.target;
               return (
