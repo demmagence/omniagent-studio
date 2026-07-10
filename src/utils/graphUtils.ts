@@ -1,7 +1,14 @@
 import { Node, Edge } from '../types';
 
 export function serializeGraph(nodes: Node[], edges: Edge[]): string {
-  return JSON.stringify({ nodes, edges }, null, 2);
+  const sanitizedNodes = nodes.map(node => {
+    if (node.data && node.data.apiKey) {
+      const { apiKey, ...restData } = node.data;
+      return { ...node, data: restData };
+    }
+    return node;
+  });
+  return JSON.stringify({ nodes: sanitizedNodes, edges }, null, 2);
 }
 
 export function deserializeGraph(jsonStr: string): { nodes: Node[]; edges: Edge[] } {
