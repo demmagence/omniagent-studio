@@ -3,7 +3,7 @@ import { hasCycle } from '../utils/graphUtils';
 import { callLLM } from './api';
 import { Node, TraceStep } from '../types';
 
-function getWordFrequency(text: string): Map<string, number> {
+export function getWordFrequency(text: string): Map<string, number> {
   const words = text.toLowerCase().match(/\b\w+\b/g) || [];
   const freq = new Map<string, number>();
   for (const w of words) {
@@ -12,7 +12,7 @@ function getWordFrequency(text: string): Map<string, number> {
   return freq;
 }
 
-function calculateCosineSimilarity(freq1: Map<string, number>, freq2: Map<string, number>): number {
+export function calculateCosineSimilarity(freq1: Map<string, number>, freq2: Map<string, number>): number {
   let dotProduct = 0;
   let norm1 = 0;
   let norm2 = 0;
