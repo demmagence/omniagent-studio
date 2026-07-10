@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useGraphStore, graphStore } from '../store/graphStore';
 import { Node } from './Node';
 
 export const Canvas: React.FC = () => {
   const { nodes, edges, selectedNodeId, selectedRunId, canUndo, canRedo, traceSteps } = useGraphStore();
+  const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
+  const traceMap = useMemo(() => new Map(traceSteps.map(t => [t.nodeId, t])), [traceSteps]);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [activeConnection, setActiveConnection] = useState<{
@@ -544,7 +546,7 @@ export const Canvas: React.FC = () => {
             const x2 = tgtNode.position.x;
             const y2 = tgtNode.position.y + 60;
 
-            const trace = traceSteps.find((s) => s.nodeId === srcNode.id);
+            const trace = traceMap.get(srcNode.id);
             const status = trace ? trace.status : null;
 
             let strokeColor = '#4b5563';
