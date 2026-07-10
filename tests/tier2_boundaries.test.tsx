@@ -5,6 +5,26 @@ import { callLLM } from '../src/services/api';
 import { deserializeGraph, hasCycle } from '../src/utils/graphUtils';
 
 describe('Tier 2: Boundary & Edge Cases', () => {
+  it('handles executeNode rejection gracefully and updates trace steps', async () => {
+    graphStore.resetGraph();
+    const n1 = graphStore.addNode('Prompt');
+    const n2 = graphStore.addNode('LLM');
+    graphStore.addEdge(n1.id, n2.id);
+
+    // Make n1 invalid so it throws
+    const state = graphStore.getState();
+    const invalidNode = { ...state.nodes[0], type: 'InvalidType' as any };
+    graphStore.setGraph([invalidNode, state.nodes[1]], state.edges);
+
+    await expect(executeWorkflow({ fallback: true })).rejects.toThrow('Unknown node type: InvalidType');
+
+    const steps = graphStore.getState().traceSteps;
+    expect(steps.find(s => s.nodeId === n1.id)?.status).toBe('failed');
+    expect(steps.find(s => s.nodeId === n1.id)?.log).toContain('Error executing node: Unknown node type');
+    expect(steps.find(s => s.nodeId === n2.id)?.status).toBe('failed');
+    expect(steps.find(s => s.nodeId === n2.id)?.log).toContain('Aborted: Unknown node type');
+  });
+
   const addEdgeUnsafeForTest = (source: string, target: string, id = 'cycle') => {
     const unsafeEdge = { id, source, target };
     const state = graphStore.getState();
