@@ -78,6 +78,14 @@ describe('Tier 2: Boundary & Edge Cases', () => {
     expect(result.edges).toEqual([]);
   });
 
+  it('JSON deserialize with non-array nodes throws Error', () => {
+    expect(() => deserializeGraph('{"nodes": "not an array"}')).toThrow('Failed to deserialize graph: nodes must be an array');
+  });
+
+  it('JSON deserialize with non-array edges throws Error', () => {
+    expect(() => deserializeGraph('{"edges": "not an array"}')).toThrow('Failed to deserialize graph: edges must be an array');
+  });
+
   // Circular graphs
   it('hasCycle returns true on circular node connections', () => {
     const n1 = { id: 'A', type: 'LLM' as const, position: { x: 0, y: 0 }, data: { label: 'A', type: 'LLM' as const } };
