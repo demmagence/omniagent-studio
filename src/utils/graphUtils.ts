@@ -1,7 +1,14 @@
 import { Node, Edge } from '../types';
 
 export function serializeGraph(nodes: Node[], edges: Edge[]): string {
-  return JSON.stringify({ nodes, edges }, null, 2);
+  const sanitizedNodes = nodes.map(node => {
+    if (node.data && node.data.apiKey) {
+      const { apiKey, ...restData } = node.data;
+      return { ...node, data: restData };
+    }
+    return node;
+  });
+  return JSON.stringify({ nodes: sanitizedNodes, edges }, null, 2);
 }
 
 export function deserializeGraph(jsonStr: string): { nodes: Node[]; edges: Edge[] } {
@@ -58,50 +65,6 @@ export function hasCycle(nodes: Node[], edges: Edge[]): boolean {
     if (dfs(node.id)) return true;
   }
   return false;
-}
-
-export function getTopologicalOrder(nodes: Node[], edges: Edge[]): string[] {
-  const adjList = new Map<string, string[]>();
-  const inDegree = new Map<string, number>();
-
-  for (const node of nodes) {
-    adjList.set(node.id, []);
-    inDegree.set(node.id, 0);
-  }
-
-  for (const edge of edges) {
-    if (adjList.has(edge.source)) {
-      adjList.get(edge.source)!.push(edge.target);
-    }
-    if (inDegree.has(edge.target)) {
-      inDegree.set(edge.target, inDegree.get(edge.target)! + 1);
-    }
-  }
-
-  const queue: string[] = [];
-  for (const [nodeId, degree] of inDegree.entries()) {
-    if (degree === 0) {
-      queue.push(nodeId);
-    }
-  }
-
-  const order: string[] = [];
-  while (queue.length > 0) {
-    const u = queue.shift()!;
-    order.push(u);
-
-    const neighbors = adjList.get(u) || [];
-    for (const v of neighbors) {
-      if (inDegree.has(v)) {
-        inDegree.set(v, inDegree.get(v)! - 1);
-        if (inDegree.get(v) === 0) {
-          queue.push(v);
-        }
-      }
-    }
-  }
-
-  return order;
 }
 
 /**
