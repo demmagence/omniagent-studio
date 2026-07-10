@@ -307,4 +307,24 @@ describe('Tier 2: Boundary & Edge Cases', () => {
     expect(edge).toBeNull();
     expect(graphStore.getState().edges.length).toBe(0);
   });
+
+
+  it('JSONPath node handles malformed JSON string gracefully', async () => {
+    const p = graphStore.addNode('Prompt');
+    graphStore.updateNodeData(p.id, { promptTemplate: '{"invalid": "json"' });
+
+    const j = graphStore.addNode('JSONPath');
+    graphStore.updateNodeData(j.id, { jsonPath: '' });
+
+    graphStore.addEdge(p.id, j.id);
+
+    const steps = await executeWorkflow({ fallback: true });
+
+    const jsonPathStep = steps.find(s => s.nodeId === j.id);
+    expect(jsonPathStep).toBeDefined();
+    expect(jsonPathStep?.status).toBe('completed');
+    expect(jsonPathStep?.input).toBe('{"invalid": "json"');
+    expect(jsonPathStep?.output).toBe('{"invalid": "json"');
+  });
+
 });
