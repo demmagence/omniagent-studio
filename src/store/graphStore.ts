@@ -54,11 +54,15 @@ class GraphStore {
     this.listeners.forEach((l) => l({ ...this.state }));
   }
 
-  saveHistoryState() {
-    this.undoStack.push({
+  private cloneGraphState() {
+    return {
       nodes: JSON.parse(JSON.stringify(this.state.nodes)),
       edges: JSON.parse(JSON.stringify(this.state.edges)),
-    });
+    };
+  }
+
+  saveHistoryState() {
+    this.undoStack.push(this.cloneGraphState());
     this.redoStack = [];
     this.state.canUndo = this.undoStack.length > 0;
     this.state.canRedo = false;
@@ -69,10 +73,7 @@ class GraphStore {
     if (this.undoStack.length === 0) return;
     const previous = this.undoStack.pop();
     if (previous) {
-      this.redoStack.push({
-        nodes: JSON.parse(JSON.stringify(this.state.nodes)),
-        edges: JSON.parse(JSON.stringify(this.state.edges)),
-      });
+      this.redoStack.push(this.cloneGraphState());
       this.state.nodes = previous.nodes;
       this.state.edges = previous.edges;
       if (this.state.selectedNodeId && !this.state.nodes.some((n) => n.id === this.state.selectedNodeId)) {
@@ -88,10 +89,7 @@ class GraphStore {
     if (this.redoStack.length === 0) return;
     const next = this.redoStack.pop();
     if (next) {
-      this.undoStack.push({
-        nodes: JSON.parse(JSON.stringify(this.state.nodes)),
-        edges: JSON.parse(JSON.stringify(this.state.edges)),
-      });
+      this.undoStack.push(this.cloneGraphState());
       this.state.nodes = next.nodes;
       this.state.edges = next.edges;
       this.state.canUndo = this.undoStack.length > 0;
