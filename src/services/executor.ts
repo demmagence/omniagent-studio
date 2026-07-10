@@ -3,7 +3,7 @@ import { hasCycle } from '../utils/graphUtils';
 import { callLLM } from './api';
 import { Node, TraceStep } from '../types';
 
-function getWordFrequency(text: string): Map<string, number> {
+export function getWordFrequency(text: string): Map<string, number> {
   const words = text.toLowerCase().match(/\b\w+\b/g) || [];
   const freq = new Map<string, number>();
   for (const w of words) {
