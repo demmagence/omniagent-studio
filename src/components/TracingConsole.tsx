@@ -6,7 +6,7 @@ export const TracingConsole: React.FC = () => {
   const { traceSteps, isRunning, nodes, selectedRunId } = useGraphStore();
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [elapsedTime, setElapsedTime] = React.useState<number>(0);
-  const timerRef = React.useRef<any>(null);
+  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = React.useRef<number>(0);
 
   React.useEffect(() => {
