@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { serializeGraph, autoLayout, deserializeGraph, hasCycle } from '../src/utils/graphUtils';
+import { serializeGraph, autoLayout, deserializeGraph } from '../src/utils/graphUtils';
 import { Node, Edge } from '../src/types';
 
 describe('serializeGraph', () => {
