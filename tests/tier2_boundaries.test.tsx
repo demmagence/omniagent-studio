@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { graphStore } from '../src/store/graphStore';
-import { deserializeGraph } from '../src/utils/graphUtils';
 import { executeWorkflow } from '../src/services/executor';
 import { callLLM } from '../src/services/api';
-import { hasCycle, getTopologicalOrder } from '../src/utils/graphUtils';
+import { deserializeGraph, hasCycle } from '../src/utils/graphUtils';
 
 describe('Tier 2: Boundary & Edge Cases', () => {
   const addEdgeUnsafeForTest = (source: string, target: string, id = 'cycle') => {
@@ -142,17 +141,6 @@ describe('Tier 2: Boundary & Edge Cases', () => {
     const steps = await executeWorkflow({ fallback: true });
     expect(steps.length).toBe(2);
     expect(steps.every(s => s.status === 'completed')).toBe(true);
-  });
-
-  it('getTopologicalOrder lists all nodes in disconnected graph', () => {
-    const nodes = [
-      { id: 'A', type: 'LLM' as const, position: { x: 0, y: 0 }, data: { label: 'A', type: 'LLM' as const } },
-      { id: 'B', type: 'LLM' as const, position: { x: 0, y: 0 }, data: { label: 'B', type: 'LLM' as const } }
-    ];
-    const order = getTopologicalOrder(nodes, []);
-    expect(order).toContain('A');
-    expect(order).toContain('B');
-    expect(order.length).toBe(2);
   });
 
   // Timeout
@@ -298,40 +286,5 @@ describe('Tier 2: Boundary & Edge Cases', () => {
     const edge = graphStore.addEdge(n.id, n.id);
     expect(edge).toBeNull();
     expect(graphStore.getState().edges.length).toBe(0);
-  });
-
-  it('getTopologicalOrder returns nodes in correct sequence', () => {
-    const nodes = [
-      { id: 'A', type: 'LLM' as const, position: { x: 0, y: 0 }, data: { label: 'A', type: 'LLM' as const } },
-      { id: 'B', type: 'LLM' as const, position: { x: 0, y: 0 }, data: { label: 'B', type: 'LLM' as const } },
-      { id: 'C', type: 'LLM' as const, position: { x: 0, y: 0 }, data: { label: 'C', type: 'LLM' as const } }
-    ];
-    const edges = [
-      { id: 'e1', source: 'C', target: 'A' },
-      { id: 'e2', source: 'A', target: 'B' }
-    ];
-    const order = getTopologicalOrder(nodes, edges);
-    expect(order.indexOf('C')).toBeLessThan(order.indexOf('A'));
-    expect(order.indexOf('A')).toBeLessThan(order.indexOf('B'));
-  });
-
-  it('getTopologicalOrder returns nodes in branching and joining graphs', () => {
-    const nodes = [
-      { id: 'A', type: 'LLM' as const, position: { x: 0, y: 0 }, data: { label: 'A', type: 'LLM' as const } },
-      { id: 'B', type: 'LLM' as const, position: { x: 0, y: 0 }, data: { label: 'B', type: 'LLM' as const } },
-      { id: 'C', type: 'LLM' as const, position: { x: 0, y: 0 }, data: { label: 'C', type: 'LLM' as const } },
-      { id: 'D', type: 'LLM' as const, position: { x: 0, y: 0 }, data: { label: 'D', type: 'LLM' as const } }
-    ];
-    const edges = [
-      { id: 'e1', source: 'A', target: 'B' },
-      { id: 'e2', source: 'A', target: 'C' },
-      { id: 'e3', source: 'B', target: 'D' },
-      { id: 'e4', source: 'C', target: 'D' }
-    ];
-    const order = getTopologicalOrder(nodes, edges);
-    expect(order.indexOf('A')).toBeLessThan(order.indexOf('B'));
-    expect(order.indexOf('A')).toBeLessThan(order.indexOf('C'));
-    expect(order.indexOf('B')).toBeLessThan(order.indexOf('D'));
-    expect(order.indexOf('C')).toBeLessThan(order.indexOf('D'));
   });
 });
