@@ -17,6 +17,14 @@ export const Canvas: React.FC = () => {
   const zoomRef = useRef(zoom);
   const panRef = useRef(pan);
 
+  const nodeMap = React.useMemo(() => {
+    const map = new Map<string, typeof nodes[0]>();
+    for (const node of nodes) {
+      map.set(node.id, node);
+    }
+    return map;
+  }, [nodes]);
+
   useEffect(() => {
     zoomRef.current = zoom;
     panRef.current = pan;
@@ -150,7 +158,7 @@ export const Canvas: React.FC = () => {
 
     const initialMouseX = e.clientX;
     const initialMouseY = e.clientY;
-    const targetNode = nodes.find(n => n.id === nodeId);
+    const targetNode = nodeMap.get(nodeId);
     if (!targetNode) return;
     const initialNodeX = targetNode.position.x;
     const initialNodeY = targetNode.position.y;
@@ -527,8 +535,8 @@ export const Canvas: React.FC = () => {
           }}
         >
           {edges.map((edge) => {
-            const srcNode = nodes.find(n => n.id === edge.source);
-            const tgtNode = nodes.find(n => n.id === edge.target);
+            const srcNode = nodeMap.get(edge.source);
+            const tgtNode = nodeMap.get(edge.target);
             if (!srcNode || !tgtNode) return null;
 
             const x1 = srcNode.position.x + 200;
@@ -574,7 +582,7 @@ export const Canvas: React.FC = () => {
           })}
 
           {activeConnection && (() => {
-            const srcNode = nodes.find(n => n.id === activeConnection.nodeId);
+            const srcNode = nodeMap.get(activeConnection.nodeId);
             if (!srcNode) return null;
 
             let x1, y1, x2, y2;
@@ -635,8 +643,8 @@ export const Canvas: React.FC = () => {
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {edges.map((edge) => {
-              const srcNode = nodes.find(n => n.id === edge.source);
-              const tgtNode = nodes.find(n => n.id === edge.target);
+              const srcNode = nodeMap.get(edge.source);
+              const tgtNode = nodeMap.get(edge.target);
               const srcLabel = srcNode?.data.label || edge.source;
               const tgtLabel = tgtNode?.data.label || edge.target;
               return (
