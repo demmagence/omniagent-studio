@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { graphStore } from '../src/store/graphStore';
 import { executeWorkflow } from '../src/services/executor';
 import { callLLM } from '../src/services/api';
-import { deserializeGraph, hasCycle, getTopologicalOrder } from '../src/utils/graphUtils';
+import { deserializeGraph, hasCycle } from '../src/utils/graphUtils';
 
 describe('Tier 2: Boundary & Edge Cases', () => {
   it('handles executeNode rejection gracefully and updates trace steps', async () => {
