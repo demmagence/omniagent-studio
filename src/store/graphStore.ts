@@ -186,9 +186,9 @@ class GraphStore {
   updateTraceStep(step: Partial<TraceStep> & { nodeId: string }) {
     const existingIndex = this.state.traceSteps.findIndex((s) => s.nodeId === step.nodeId);
     if (existingIndex !== -1) {
-      this.state.traceSteps = this.state.traceSteps.map((s, idx) =>
-        idx === existingIndex ? { ...s, ...step } : s
-      );
+      const newTraceSteps = [...this.state.traceSteps];
+      newTraceSteps[existingIndex] = { ...newTraceSteps[existingIndex], ...step };
+      this.state.traceSteps = newTraceSteps;
     } else {
       const newStep: TraceStep = {
         nodeId: step.nodeId,
