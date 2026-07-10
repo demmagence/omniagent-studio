@@ -81,8 +81,18 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
   const nodeMap = new Map<string, Node>(nodes.map(n => [n.id, n]));
   const outputs = new Map<string, any>();
 
+  const incomingEdgesMap = new Map<string, typeof edges>();
+  for (const node of nodes) {
+    incomingEdgesMap.set(node.id, []);
+  }
+  for (const edge of edges) {
+    if (incomingEdgesMap.has(edge.target)) {
+      incomingEdgesMap.get(edge.target)!.push(edge);
+    }
+  }
+
   const getIncomingInputs = (targetId: string) => {
-    const incomingEdges = edges.filter(e => e.target === targetId);
+    const incomingEdges = incomingEdgesMap.get(targetId) || [];
     if (incomingEdges.length === 0) return null;
     if (incomingEdges.length === 1) {
       return outputs.get(incomingEdges[0].source);
@@ -115,7 +125,7 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
         if (runningNodes.has(node.id) || completedNodes.has(node.id)) {
           return false;
         }
-        const incomingEdges = edges.filter(e => e.target === node.id);
+        const incomingEdges = incomingEdgesMap.get(node.id) || [];
         return incomingEdges.every(e => completedNodes.has(e.source));
       });
 
