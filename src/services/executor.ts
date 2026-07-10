@@ -38,6 +38,212 @@ export interface ExecutionOptions {
   maxConcurrency?: number;
 }
 
+export interface NodeExecutionResult {
+  nodeOutput: any;
+  log: string;
+  tokensUsed: number;
+  nodeInput?: any;
+}
+
+export interface NodeExecutionContext {
+  node: Node;
+  incomingInput: any;
+  fallback: boolean;
+  abortController: AbortController;
+  graphStore: typeof graphStore;
+}
+
+const nodeExecutors: Record<string, (context: NodeExecutionContext) => Promise<NodeExecutionResult> | NodeExecutionResult> = {
+  Prompt: ({ node, incomingInput }) => {
+    const template = node.data.promptTemplate || '';
+    let rendered = template;
+    if (incomingInput !== null && incomingInput !== undefined) {
+      const inputStr = typeof incomingInput === 'object'
+        ? JSON.stringify(incomingInput)
+        : String(incomingInput);
+      rendered = template.replace(/\{input\}/gi, inputStr);
+    }
+    return {
+      nodeOutput: rendered,
+      log: `Generating prompt from template: ${template}`,
+      tokensUsed: 0
+    };
+  },
+
+  LLM: async ({ node, incomingInput, fallback, abortController, graphStore }) => {
+    const prompt = typeof incomingInput === 'string'
+      ? incomingInput
+      : incomingInput !== null && incomingInput !== undefined
+        ? JSON.stringify(incomingInput)
+        : 'Default Prompt';
+
+    const callLog = `Calling ${node.data.provider || 'openai'} model: ${node.data.model || 'default'}`;
+    graphStore.updateTraceStep({
+      nodeId: node.id,
+      status: 'running',
+      log: callLog,
+    });
+
+    const response = await callLLM(
+      node.data.provider || 'openai',
+      node.data.model || '',
+      prompt,
+      {
+        systemPrompt: node.data.systemPrompt,
+        apiKey: node.data.apiKey,
+        endpointUrl: node.data.endpointUrl,
+        fallback,
+        signal: abortController.signal
+      }
+    );
+
+    return {
+      nodeOutput: response.text,
+      nodeInput: prompt,
+      log: `${callLog}\nReceived LLM response. Tokens used: ${response.tokensUsed}`,
+      tokensUsed: response.tokensUsed
+    };
+  },
+
+  Tool: ({ node, incomingInput }) => {
+    const toolName = node.data.toolName || 'calculator';
+    let nodeOutput: any;
+
+    if (toolName === 'calculator') {
+      const val = typeof incomingInput === 'string' ? incomingInput : String(incomingInput || '');
+      const cleanVal = val.includes('Response to:') ? val.split('Response to:')[1] : val;
+      const numbers = cleanVal.match(/\d+/g);
+      if (numbers && numbers.length >= 2) {
+        const sum = numbers.reduce((a, b) => a + Number(b), 0);
+        nodeOutput = `Result: ${sum}`;
+      } else {
+        nodeOutput = `Processed: Length = ${val.length}`;
+      }
+    } else if (toolName === 'webSearch') {
+      nodeOutput = `[Web Search results for: ${JSON.stringify(incomingInput)}] Found AI agent documents.`;
+    } else {
+      nodeOutput = `Tool ${toolName} executed successfully with inputs: ${JSON.stringify(incomingInput)}`;
+    }
+
+    return {
+      nodeOutput,
+      log: `Executing tool: ${toolName}`,
+      tokensUsed: 0
+    };
+  },
+
+  Router: ({ node, incomingInput }) => {
+    const inputVal = typeof incomingInput === 'string' ? incomingInput : JSON.stringify(incomingInput || '');
+    const rules = node.data.routingRules || '';
+    let nodeOutput = 'Default Route';
+
+    if (rules && inputVal) {
+      const lowerInput = inputVal.toLowerCase();
+      if (lowerInput.includes('error') || lowerInput.includes('fail')) {
+        nodeOutput = 'Error Branch';
+      } else if (lowerInput.includes('tool') || lowerInput.includes('search')) {
+        nodeOutput = 'Tool Branch';
+      }
+    }
+
+    return {
+      nodeOutput,
+      log: `Routing input based on rules: ${rules}`,
+      tokensUsed: 0
+    };
+  },
+
+  VectorDB: ({ node, incomingInput }) => {
+    const queryStr = typeof incomingInput === 'string'
+      ? incomingInput
+      : incomingInput !== null && incomingInput !== undefined
+        ? JSON.stringify(incomingInput)
+        : '';
+
+    const model = node.data.embeddingModel || 'default';
+    const docs = (node.data.documents || '')
+      .split('\n')
+      .map((d: string) => d.trim())
+      .filter(Boolean);
+
+    const threshold = node.data.similarityThreshold !== undefined
+      ? node.data.similarityThreshold
+      : 0;
+
+    let log = `Running VectorDB query on ${docs.length} documents using model: ${model} with threshold ${threshold}`;
+
+    const queryFreq = getWordFrequency(queryStr);
+    const matches = docs
+      .map((doc: string) => {
+        const docFreq = getWordFrequency(doc);
+        const similarity = calculateCosineSimilarity(queryFreq, docFreq);
+        return { doc, similarity };
+      })
+      .filter((item: { doc: string, similarity: number }) => item.similarity >= threshold)
+      .sort((a: { similarity: number }, b: { similarity: number }) => b.similarity - a.similarity)
+      .map((item: { doc: string }) => item.doc);
+
+    log += `. Found ${matches.length} matching documents.`;
+
+    return {
+      nodeOutput: matches,
+      nodeInput: queryStr,
+      log,
+      tokensUsed: 0
+    };
+  },
+
+  JSONPath: ({ node, incomingInput }) => {
+    let parsedInput: any = incomingInput;
+    if (typeof incomingInput === 'string') {
+      try {
+        parsedInput = JSON.parse(incomingInput);
+      } catch (e) {
+        // Keep as is
+      }
+    }
+
+    const rawPath = node.data.jsonPath || '';
+    const path = rawPath.replace(/^\$/, '');
+    const cleanPath = path
+      .replace(/\[\s*['"]?([^'"]+?)['"]?\s*\]/g, '.$1')
+      .replace(/^\./, '');
+
+    let current = parsedInput;
+    if (cleanPath) {
+      const keys = cleanPath.split('.').filter(Boolean);
+      for (const key of keys) {
+        if (current === null || current === undefined) {
+          current = undefined;
+          break;
+        }
+        if (Array.isArray(current)) {
+          const idx = parseInt(key, 10);
+          if (!isNaN(idx)) {
+            current = current[idx];
+            continue;
+          }
+        }
+        current = current[key];
+      }
+    }
+
+    return {
+      nodeOutput: current,
+      log: `Extracting path '${rawPath}' from input`,
+      tokensUsed: 0
+    };
+  },
+
+  Output: ({ incomingInput }) => {
+    return {
+      nodeOutput: incomingInput,
+      log: `Workflow finalized. Final output received: ${JSON.stringify(incomingInput)}`,
+      tokensUsed: 0
+    };
+  }
+};
+
 export async function executeWorkflow(options: ExecutionOptions = {}): Promise<TraceStep[]> {
   const { nodes, edges, isFallbackMode, selectedRunId, maxConcurrency: storeMaxConcurrency } = graphStore.getState();
   if (selectedRunId !== null) {
@@ -182,188 +388,23 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
       });
 
       const incomingInput = getIncomingInputs(nodeId);
-      let nodeInput = incomingInput;
-      let nodeOutput: any = null;
-      let tokensUsed = 0;
-      let log = '';
 
-      switch (node.type) {
-        case 'Prompt': {
-          const template = node.data.promptTemplate || '';
-          log = `Generating prompt from template: ${template}`;
-          let rendered = template;
-          if (incomingInput !== null && incomingInput !== undefined) {
-            const inputStr = typeof incomingInput === 'object' 
-              ? JSON.stringify(incomingInput) 
-              : String(incomingInput);
-            rendered = template.replace(/\{input\}/gi, inputStr);
-          }
-          nodeOutput = rendered;
-          break;
-        }
-
-        case 'LLM': {
-          const prompt = typeof incomingInput === 'string' 
-            ? incomingInput 
-            : incomingInput !== null && incomingInput !== undefined
-              ? JSON.stringify(incomingInput) 
-              : 'Default Prompt';
-          
-          nodeInput = prompt;
-          const callLog = `Calling ${node.data.provider || 'openai'} model: ${node.data.model || 'default'}`;
-          graphStore.updateTraceStep({
-            nodeId,
-            status: 'running',
-            log: callLog,
-          });
-
-          const response = await callLLM(
-            node.data.provider || 'openai',
-            node.data.model || '',
-            prompt,
-            {
-              systemPrompt: node.data.systemPrompt,
-              apiKey: node.data.apiKey,
-              endpointUrl: node.data.endpointUrl,
-              fallback,
-              signal: abortController.signal
-            }
-          );
-
-          nodeOutput = response.text;
-          tokensUsed = response.tokensUsed;
-          log = `${callLog}\nReceived LLM response. Tokens used: ${tokensUsed}`;
-          break;
-        }
-
-        case 'Tool': {
-          const toolName = node.data.toolName || 'calculator';
-          log = `Executing tool: ${toolName}`;
-          
-          if (toolName === 'calculator') {
-            const val = typeof incomingInput === 'string' ? incomingInput : String(incomingInput || '');
-            const cleanVal = val.includes('Response to:') ? val.split('Response to:')[1] : val;
-            const numbers = cleanVal.match(/\d+/g);
-            if (numbers && numbers.length >= 2) {
-              const sum = numbers.reduce((a, b) => a + Number(b), 0);
-              nodeOutput = `Result: ${sum}`;
-            } else {
-              nodeOutput = `Processed: Length = ${val.length}`;
-            }
-          } else if (toolName === 'webSearch') {
-            nodeOutput = `[Web Search results for: ${JSON.stringify(incomingInput)}] Found AI agent documents.`;
-          } else {
-            nodeOutput = `Tool ${toolName} executed successfully with inputs: ${JSON.stringify(incomingInput)}`;
-          }
-          break;
-        }
-
-        case 'Router': {
-          const inputVal = typeof incomingInput === 'string' ? incomingInput : JSON.stringify(incomingInput || '');
-          const rules = node.data.routingRules || '';
-          log = `Routing input based on rules: ${rules}`;
-          
-          if (rules && inputVal) {
-            const lowerInput = inputVal.toLowerCase();
-            if (lowerInput.includes('error') || lowerInput.includes('fail')) {
-              nodeOutput = 'Error Branch';
-            } else if (lowerInput.includes('tool') || lowerInput.includes('search')) {
-              nodeOutput = 'Tool Branch';
-            } else {
-              nodeOutput = 'Default Route';
-            }
-          } else {
-            nodeOutput = 'Default Route';
-          }
-          break;
-        }
-
-        case 'VectorDB': {
-          const queryStr = typeof incomingInput === 'string'
-            ? incomingInput
-            : incomingInput !== null && incomingInput !== undefined
-              ? JSON.stringify(incomingInput)
-              : '';
-
-          nodeInput = queryStr;
-          const model = node.data.embeddingModel || 'default';
-          const docs = (node.data.documents || '')
-            .split('\n')
-            .map(d => d.trim())
-            .filter(Boolean);
-
-          const threshold = node.data.similarityThreshold !== undefined
-            ? node.data.similarityThreshold
-            : 0;
-
-          log = `Running VectorDB query on ${docs.length} documents using model: ${model} with threshold ${threshold}`;
-
-          const queryFreq = getWordFrequency(queryStr);
-          const matches = docs
-            .map(doc => {
-              const docFreq = getWordFrequency(doc);
-              const similarity = calculateCosineSimilarity(queryFreq, docFreq);
-              return { doc, similarity };
-            })
-            .filter(item => item.similarity >= threshold)
-            .sort((a, b) => b.similarity - a.similarity)
-            .map(item => item.doc);
-
-          nodeOutput = matches;
-          log += `. Found ${matches.length} matching documents.`;
-          break;
-        }
-
-        case 'JSONPath': {
-          let parsedInput: any = incomingInput;
-          if (typeof incomingInput === 'string') {
-            try {
-              parsedInput = JSON.parse(incomingInput);
-            } catch (e) {
-              // Keep as is
-            }
-          }
-
-          const rawPath = node.data.jsonPath || '';
-          const path = rawPath.replace(/^\$/, '');
-          const cleanPath = path
-            .replace(/\[\s*['"]?([^'"]+?)['"]?\s*\]/g, '.$1')
-            .replace(/^\./, '');
-
-          log = `Extracting path '${rawPath}' from input`;
-
-          let current = parsedInput;
-          if (cleanPath) {
-            const keys = cleanPath.split('.').filter(Boolean);
-            for (const key of keys) {
-              if (current === null || current === undefined) {
-                current = undefined;
-                break;
-              }
-              if (Array.isArray(current)) {
-                const idx = parseInt(key, 10);
-                if (!isNaN(idx)) {
-                  current = current[idx];
-                  continue;
-                }
-              }
-              current = current[key];
-            }
-          }
-
-          nodeOutput = current;
-          break;
-        }
-
-        case 'Output': {
-          nodeOutput = incomingInput;
-          log = `Workflow finalized. Final output received: ${JSON.stringify(nodeOutput)}`;
-          break;
-        }
-
-        default:
-          throw new Error(`Unknown node type: ${node.type}`);
+      const executor = nodeExecutors[node.type];
+      if (!executor) {
+        throw new Error(`Unknown node type: ${node.type}`);
       }
+
+      const executionContext: NodeExecutionContext = {
+        node,
+        incomingInput,
+        fallback,
+        abortController,
+        graphStore
+      };
+
+      const result = await executor(executionContext);
+      const nodeInput = result.nodeInput !== undefined ? result.nodeInput : incomingInput;
+      const { nodeOutput, log, tokensUsed } = result;
 
       if (aborted) return;
 
