@@ -62,7 +62,7 @@ function parseFetchRequest(url: unknown, init: RequestInit | undefined): { promp
 
   const prompt = (lastMessage as { content: unknown }).content;
   expect(typeof prompt).toBe('string');
-  return { prompt, signal: init!.signal };
+  return { prompt: prompt as string, signal: init!.signal };
 }
 
 // Build a mocked `fetch` that validates each request (via parseFetchRequest)

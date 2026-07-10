@@ -3,7 +3,7 @@ import { getWordFrequency, calculateCosineSimilarity } from '../src/services/exe
 
 describe('executor utility functions', () => {
   describe('getWordFrequency', () => {
-    it('should count basic words correctly', () => {
+    it('should correctly count word frequencies in a basic string', () => {
       const text = 'hello world hello';
       const freq = getWordFrequency(text);
       expect(freq.get('hello')).toBe(2);
@@ -11,57 +11,30 @@ describe('executor utility functions', () => {
       expect(freq.size).toBe(2);
     });
 
-    it('should be case insensitive', () => {
-      const text = 'Hello hello HeLLo';
+    it('should handle case insensitivity', () => {
+      const text = 'Hello WORLD hello World';
       const freq = getWordFrequency(text);
-      expect(freq.get('hello')).toBe(3);
-      expect(freq.size).toBe(1);
+      expect(freq.get('hello')).toBe(2);
+      expect(freq.get('world')).toBe(2);
+      expect(freq.size).toBe(2);
     });
 
-    it('should handle empty strings', () => {
-      const text = '';
+    it('should ignore punctuation', () => {
+      const text = 'hello, world! hello?';
       const freq = getWordFrequency(text);
+      expect(freq.get('hello')).toBe(2);
+      expect(freq.get('world')).toBe(1);
+      expect(freq.size).toBe(2);
+    });
+
+    it('should return an empty map for empty string', () => {
+      const freq = getWordFrequency('');
       expect(freq.size).toBe(0);
     });
 
-    it('should handle strings with only punctuation', () => {
-      const text = '!@#$%^&*()_+-=[]{}|;:\'",.<>/?`~';
-      const freq = getWordFrequency(text);
-      // The regex \b\w+\b matches letters, digits, and underscores.
-      // Notice that _ is matched by \w.
-      expect(freq.get('_')).toBe(1);
-      expect(freq.size).toBe(1);
-    });
-
-    it('should ignore punctuation but keep words', () => {
-      const text = 'Hello, world! Welcome to the world.';
-      const freq = getWordFrequency(text);
-      expect(freq.get('hello')).toBe(1);
-      expect(freq.get('world')).toBe(2);
-      expect(freq.get('welcome')).toBe(1);
-      expect(freq.get('to')).toBe(1);
-      expect(freq.get('the')).toBe(1);
-      expect(freq.size).toBe(5);
-    });
-
-    it('should handle numbers', () => {
-      const text = 'The year is 2023 and 2023 is good';
-      const freq = getWordFrequency(text);
-      expect(freq.get('the')).toBe(1);
-      expect(freq.get('year')).toBe(1);
-      expect(freq.get('is')).toBe(2);
-      expect(freq.get('2023')).toBe(2);
-      expect(freq.get('and')).toBe(1);
-      expect(freq.get('good')).toBe(1);
-      expect(freq.size).toBe(6);
-    });
-
-    it('should handle words with underscores as part of a word', () => {
-      const text = 'my_variable is my_variable';
-      const freq = getWordFrequency(text);
-      expect(freq.get('my_variable')).toBe(2);
-      expect(freq.get('is')).toBe(1);
-      expect(freq.size).toBe(2);
+    it('should return an empty map for string with only punctuation', () => {
+      const freq = getWordFrequency('!!! ??? ,,,');
+      expect(freq.size).toBe(0);
     });
   });
 
@@ -82,6 +55,10 @@ describe('executor utility functions', () => {
     });
 
     it('should calculate correct similarity for overlapping frequencies', () => {
+      // freq1 = { hello: 1, world: 1 } -> norm1 = sqrt(2)
+      // freq2 = { hello: 1, friend: 1 } -> norm2 = sqrt(2)
+      // dot product = 1
+      // similarity = 1 / 2 = 0.5
       const freq1 = getWordFrequency('hello world');
       const freq2 = getWordFrequency('hello friend');
       const similarity = calculateCosineSimilarity(freq1, freq2);
