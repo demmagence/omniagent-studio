@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { serializeGraph, autoLayout } from '../src/utils/graphUtils';
+import { serializeGraph, autoLayout, deserializeGraph, hasCycle } from '../src/utils/graphUtils';
 import { Node, Edge } from '../src/types';
 
 describe('serializeGraph', () => {
@@ -147,5 +147,17 @@ describe('autoLayout', () => {
     expect(result.get('A')).toEqual({ x: 80, y: 20 });
     expect(result.get('B')).toEqual({ x: 80, y: 60 });
     expect(result.get('C')).toEqual({ x: 80, y: 220 });
+  });
+});
+
+describe('deserializeGraph', () => {
+  it('should throw an error if nodes is not an array', () => {
+    const jsonStr = JSON.stringify({ nodes: 'not an array', edges: [] });
+    expect(() => deserializeGraph(jsonStr)).toThrow('Failed to deserialize graph: nodes must be an array');
+  });
+
+  it('should throw an error if edges is not an array', () => {
+    const jsonStr = JSON.stringify({ nodes: [], edges: 'not an array' });
+    expect(() => deserializeGraph(jsonStr)).toThrow('Failed to deserialize graph: edges must be an array');
   });
 });
