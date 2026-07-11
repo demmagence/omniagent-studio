@@ -114,7 +114,8 @@ const nodeExecutors: Record<string, (context: NodeExecutionContext) => Promise<N
       const cleanVal = val.includes('Response to:') ? val.split('Response to:')[1] : val;
       const numbers = cleanVal.match(/\d+/g);
       if (numbers && numbers.length >= 2) {
-        const sum = numbers.reduce((a, b) => a + Number(b), 0);
+        const parsedNumbers = numbers.map((n) => Number(n));
+        const sum = parsedNumbers.reduce<number>((acc, n) => acc + n, 0);
         nodeOutput = `Result: ${sum}`;
       } else {
         nodeOutput = `Processed: Length = ${val.length}`;
@@ -336,7 +337,15 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
       });
 
       if (readyNodes.length === 0 && runningNodes.size === 0) {
-        resolve(graphStore.getState().traceSteps);
+        if (completedNodes.size === nodes.length) {
+          resolve(graphStore.getState().traceSteps);
+          return;
+        }
+
+        const incompleteNodeIds = nodes
+          .filter(n => !completedNodes.has(n.id))
+          .map(n => n.id);
+        reject(new Error(`Workflow is stuck: no runnable nodes and no running nodes. Incomplete nodes: ${incompleteNodeIds.join(', ')}`));
         return;
       }
 
