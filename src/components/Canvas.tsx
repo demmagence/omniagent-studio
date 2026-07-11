@@ -4,7 +4,13 @@ import { Node } from './Node';
 
 export const Canvas: React.FC = () => {
   const { nodes, edges, selectedNodeId, selectedRunId, canUndo, canRedo, traceSteps } = useGraphStore();
-  const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
+  const nodeMap = useMemo(() => {
+    const map = new Map<string, typeof nodes[0]>();
+    for (const node of nodes) {
+      map.set(node.id, node);
+    }
+    return map;
+  }, [nodes]);
   const traceMap = useMemo(() => new Map(traceSteps.map(t => [t.nodeId, t])), [traceSteps]);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -18,14 +24,6 @@ export const Canvas: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef(zoom);
   const panRef = useRef(pan);
-
-  const nodeMap = React.useMemo(() => {
-    const map = new Map<string, typeof nodes[0]>();
-    for (const node of nodes) {
-      map.set(node.id, node);
-    }
-    return map;
-  }, [nodes]);
 
   useEffect(() => {
     zoomRef.current = zoom;
