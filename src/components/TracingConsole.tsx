@@ -143,7 +143,7 @@ export const TracingConsole: React.FC = () => {
         {traceSteps.length === 0 ? (
           <p style={{ color: '#6b7280', fontSize: '13px', margin: 0 }}>No trace steps. Hit "Run Workflow" to execute.</p>
         ) : (
-          traceSteps.map((step) => {
+          traceSteps.map((step, index) => {
             const node = nodeMap.get(step.nodeId);
             const label = node?.data.label || step.nodeId;
             const statusColors = {
@@ -154,7 +154,7 @@ export const TracingConsole: React.FC = () => {
             };
             return (
               <div
-                key={step.nodeId}
+                key={`${step.nodeId}-${index}`}
                 data-testid={`trace-step-${step.nodeId}`}
                 style={{
                   borderLeft: `4px solid ${statusColors[step.status]}`,
