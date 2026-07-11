@@ -65,7 +65,7 @@ export function validateEndpointUrl(endpoint: string): void {
     // e.g., [::ffff:169.254.169.254] -> ::ffff:a9fe:a9fe
     // e.g., [::127.0.0.1] -> ::7f00:1
     if (ip6.includes('a9fe:a9fe')) isPrivate = true;
-    if (ip6.includes(':7f00:') || ip6.endsWith(':7f00:1')) isLocal = true;
+    if (ip6.startsWith('::ffff:7f') || ip6.startsWith('::7f')) isLocal = true;
   }
 
   // Disallow explicit metadata/private IPs
