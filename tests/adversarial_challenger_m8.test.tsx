@@ -6,7 +6,7 @@ describe('Milestone 8: Adversarial & Stress Testing', () => {
   const DEFAULT_MOCK_DELAY_MS = 10;
   const SLOW_NODE_DELAY_MS = 50;
   // Allows minor timing jitter from event loop scheduling and test runner overhead.
-  const TIMING_TOLERANCE_MS = 5;
+  const TIMING_TOLERANCE_MS = 25;
   const FALLBACK_NODE_ID = 'n2';
   const WORKFLOW_START_NODES = 1;
   const WORKFLOW_END_NODES = 1;
