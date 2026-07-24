@@ -1,6 +1,6 @@
 import React from 'react';
 import { graphStore, useGraphStore } from '../store/graphStore';
-import { NodeType } from '../types';
+import { NodeType, NodeCategory, NODE_CATEGORY_MAP, NODE_CATEGORIES } from '../types';
 import { serializeGraph, deserializeGraph, autoLayout } from '../utils/graphUtils';
 
 export const Sidebar: React.FC = () => {
@@ -8,15 +8,12 @@ export const Sidebar: React.FC = () => {
   const [importJson, setImportJson] = React.useState('');
   const [serializedJson, setSerializedJson] = React.useState('');
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [selectedCategory, setSelectedCategory] = React.useState<'All' | 'AI & Logic' | 'Database & Tools' | 'Output'>('All');
+  const [selectedCategory, setSelectedCategory] = React.useState<NodeCategory>('All');
 
   const nodeTypes: NodeType[] = ['LLM', 'Prompt', 'Tool', 'Router', 'Output', 'VectorDB', 'JSONPath'];
 
   const getCategoryForType = (type: NodeType): string => {
-    if (type === 'LLM' || type === 'Prompt' || type === 'Router') return 'AI & Logic';
-    if (type === 'Tool' || type === 'VectorDB' || type === 'JSONPath') return 'Database & Tools';
-    if (type === 'Output') return 'Output';
-    return 'All';
+    return NODE_CATEGORY_MAP[type] || 'All';
   };
 
   const filteredNodeTypes = nodeTypes.filter((type) => {
@@ -117,7 +114,7 @@ export const Sidebar: React.FC = () => {
 
         {/* Category Filters */}
         <div style={{ display: 'flex', gap: '4px', marginBottom: '8px', flexWrap: 'wrap' }}>
-          {(['All', 'AI & Logic', 'Database & Tools', 'Output'] as const).map((cat) => {
+          {NODE_CATEGORIES.map((cat) => {
             const isSelected = selectedCategory === cat;
             return (
               <button
