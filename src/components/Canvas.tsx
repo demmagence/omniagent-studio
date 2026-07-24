@@ -560,17 +560,19 @@ export const Canvas: React.FC = () => {
               strokeColor = '#ef4444';
             }
 
+            const bezierPath = getBezierPath(x1, y1, x2, y2);
+
             return (
               <g key={edge.id} data-testid={`edge-group-${edge.id}`}>
                 <path
-                  d={getBezierPath(x1, y1, x2, y2)}
+                  d={bezierPath}
                   fill="none"
                   stroke={strokeColor}
                   strokeWidth={5}
                   opacity={status === 'running' ? 0.3 : 0.15}
                 />
                 <path
-                  d={getBezierPath(x1, y1, x2, y2)}
+                  d={bezierPath}
                   fill="none"
                   stroke={strokeColor}
                   strokeWidth={3}
