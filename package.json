@@ -30,5 +30,8 @@
   },
   "overrides": {
     "esbuild": "^0.28.1"
+  },
+  "dependencies": {
+    "ipaddr.js": "^2.4.0"
   }
 }
