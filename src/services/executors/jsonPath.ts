@@ -24,6 +24,10 @@ export const JSONPath = ({ node, incomingInput }: NodeExecutionContext): NodeExe
         current = undefined;
         break;
       }
+      if (['__proto__', 'constructor', 'prototype'].includes(key)) {
+        current = undefined;
+        break;
+      }
       if (Array.isArray(current)) {
         const idx = parseInt(key, 10);
         if (!isNaN(idx)) {
