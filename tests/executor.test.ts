@@ -66,6 +66,22 @@ describe('executor utility functions', () => {
       const freq = getWordFrequency('!!! ??? ,,,');
       expect(freq.size).toBe(0);
     });
+
+    it('should handle large texts adequately', () => {
+      const text = 'word '.repeat(100000);
+      const freq = getWordFrequency(text);
+      expect(freq.get('word')).toBe(100000);
+      expect(freq.size).toBe(1);
+    });
+
+    it('should process varied unicode safely (ignoring unsupported characters)', () => {
+      const text = 'héllo 🌍 mundo';
+      const freq = getWordFrequency(text);
+      expect(freq.get('h')).toBe(1);
+      expect(freq.get('llo')).toBe(1);
+      expect(freq.get('mundo')).toBe(1);
+      expect(freq.size).toBe(3);
+    });
   });
 
   describe('calculateCosineSimilarity', () => {
