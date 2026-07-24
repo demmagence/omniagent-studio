@@ -17,6 +17,26 @@ export interface GraphStoreState {
 
 type Listener = (state: GraphStoreState) => void;
 
+const cloneNodes = (nodes: Node[]): Node[] => {
+  return nodes.map(n => ({
+    ...n,
+    position: { ...n.position },
+    data: { ...n.data },
+  }));
+};
+
+const cloneEdges = (edges: Edge[]): Edge[] => {
+  return edges.map(e => ({ ...e }));
+};
+
+const cloneTraceSteps = (steps: TraceStep[]): TraceStep[] => {
+  return steps.map(s => ({
+    ...s,
+    input: s.input ? JSON.parse(JSON.stringify(s.input)) : s.input,
+    output: s.output ? JSON.parse(JSON.stringify(s.output)) : s.output,
+  }));
+};
+
 class GraphStore {
   private state: GraphStoreState = {
     nodes: [],
@@ -56,8 +76,8 @@ class GraphStore {
 
   private cloneGraphState() {
     return {
-      nodes: JSON.parse(JSON.stringify(this.state.nodes)),
-      edges: JSON.parse(JSON.stringify(this.state.edges)),
+      nodes: cloneNodes(this.state.nodes),
+      edges: cloneEdges(this.state.edges),
     };
   }
 
@@ -220,9 +240,9 @@ class GraphStore {
     const newEntry: RunHistoryEntry = {
       id: `run_${Math.random().toString(36).substring(2, 9)}`,
       timestamp: new Date().toISOString(),
-      nodes: JSON.parse(JSON.stringify(run.nodes)),
-      edges: JSON.parse(JSON.stringify(run.edges)),
-      traceSteps: JSON.parse(JSON.stringify(run.traceSteps)),
+      nodes: cloneNodes(run.nodes),
+      edges: cloneEdges(run.edges),
+      traceSteps: cloneTraceSteps(run.traceSteps),
       status: run.status,
     };
     this.state.history = [...this.state.history, newEntry];
