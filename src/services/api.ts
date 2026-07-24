@@ -44,8 +44,11 @@ export function validateEndpointUrl(endpoint: string): void {
       let parsedIp = ipaddr.parse(ipToParse);
 
       // If IPv4 mapped IPv6, unmap it to test the actual IPv4 address
-      if (parsedIp.kind() === 'ipv6' && parsedIp.isIPv4MappedAddress()) {
-        parsedIp = parsedIp.toIPv4Address();
+      if (parsedIp.kind() === 'ipv6') {
+        const ip6 = parsedIp as ipaddr.IPv6;
+        if (ip6.isIPv4MappedAddress()) {
+          parsedIp = ip6.toIPv4Address();
+        }
       }
 
       const range = parsedIp.range();
