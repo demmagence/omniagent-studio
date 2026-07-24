@@ -67,22 +67,7 @@ export function hasCycle(nodes: Node[], edges: Edge[]): boolean {
   return false;
 }
 
-/**
- * Auto-layout nodes in a layered DAG arrangement.
- * Nodes are placed in columns by topological layer (depth from root),
- * vertically centered within each column.
- */
-export function autoLayout(
-  nodes: Node[],
-  edges: Edge[],
-  options: { startX?: number; startY?: number; layerGap?: number; nodeGap?: number } = {}
-): Map<string, { x: number; y: number }> {
-  const { startX = 80, startY = 60, layerGap = 280, nodeGap = 160 } = options;
-  const positions = new Map<string, { x: number; y: number }>();
-
-  if (nodes.length === 0) return positions;
-
-  // Compute in-degree per node
+function computeInDegreeAndAdjList(nodes: Node[], edges: Edge[]) {
   const inDegree = new Map<string, number>();
   const adjList = new Map<string, string[]>();
   for (const node of nodes) {
@@ -97,8 +82,10 @@ export function autoLayout(
       inDegree.set(edge.target, inDegree.get(edge.target)! + 1);
     }
   }
+  return { inDegree, adjList };
+}
 
-  // BFS layering
+function computeLayers(nodes: Node[], inDegree: Map<string, number>, adjList: Map<string, string[]>) {
   const layers: string[][] = [];
   const layerMap = new Map<string, number>();
   const queue: string[] = [];
@@ -145,9 +132,20 @@ export function autoLayout(
     }
   }
 
-  // Assign positions
-  for (let col = 0; col < finalLayers.length; col++) {
-    const nodesInLayer = finalLayers[col] || [];
+  return finalLayers;
+}
+
+function assignPositions(
+  layers: string[][],
+  startX: number,
+  startY: number,
+  layerGap: number,
+  nodeGap: number
+): Map<string, { x: number; y: number }> {
+  const positions = new Map<string, { x: number; y: number }>();
+
+  for (let col = 0; col < layers.length; col++) {
+    const nodesInLayer = layers[col] || [];
     const totalHeight = (nodesInLayer.length - 1) * nodeGap;
     const offsetY = startY - totalHeight / 2;
 
@@ -160,4 +158,27 @@ export function autoLayout(
   }
 
   return positions;
+}
+
+/**
+ * Auto-layout nodes in a layered DAG arrangement.
+ * Nodes are placed in columns by topological layer (depth from root),
+ * vertically centered within each column.
+ */
+export function autoLayout(
+  nodes: Node[],
+  edges: Edge[],
+  options: { startX?: number; startY?: number; layerGap?: number; nodeGap?: number } = {}
+): Map<string, { x: number; y: number }> {
+  const { startX = 80, startY = 60, layerGap = 280, nodeGap = 160 } = options;
+  if (nodes.length === 0) return new Map<string, { x: number; y: number }>();
+
+  // Compute in-degree per node
+  const { inDegree, adjList } = computeInDegreeAndAdjList(nodes, edges);
+
+  // BFS layering
+  const finalLayers = computeLayers(nodes, inDegree, adjList);
+
+  // Assign positions
+  return assignPositions(finalLayers, startX, startY, layerGap, nodeGap);
 }
