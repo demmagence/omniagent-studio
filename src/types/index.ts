@@ -1,5 +1,19 @@
 export type NodeType = 'LLM' | 'Prompt' | 'Tool' | 'Router' | 'Output' | 'VectorDB' | 'JSONPath';
 
+export type NodeCategory = 'AI & Logic' | 'Database & Tools' | 'Output' | 'All';
+
+export const NODE_CATEGORY_MAP: Record<NodeType, Exclude<NodeCategory, 'All'>> = {
+  LLM: 'AI & Logic',
+  Prompt: 'AI & Logic',
+  Router: 'AI & Logic',
+  Tool: 'Database & Tools',
+  VectorDB: 'Database & Tools',
+  JSONPath: 'Database & Tools',
+  Output: 'Output',
+};
+
+export const NODE_CATEGORIES: NodeCategory[] = ['All', 'AI & Logic', 'Database & Tools', 'Output'];
+
 export interface NodeData {
   label: string;
   type: NodeType;
