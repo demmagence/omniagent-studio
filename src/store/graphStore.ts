@@ -56,8 +56,8 @@ class GraphStore {
 
   private cloneGraphState() {
     return {
-      nodes: JSON.parse(JSON.stringify(this.state.nodes)),
-      edges: JSON.parse(JSON.stringify(this.state.edges)),
+      nodes: structuredClone(this.state.nodes),
+      edges: structuredClone(this.state.edges),
     };
   }
 
@@ -220,9 +220,9 @@ class GraphStore {
     const newEntry: RunHistoryEntry = {
       id: `run_${Math.random().toString(36).substring(2, 9)}`,
       timestamp: new Date().toISOString(),
-      nodes: JSON.parse(JSON.stringify(run.nodes)),
-      edges: JSON.parse(JSON.stringify(run.edges)),
-      traceSteps: JSON.parse(JSON.stringify(run.traceSteps)),
+      nodes: structuredClone(run.nodes),
+      edges: structuredClone(run.edges),
+      traceSteps: structuredClone(run.traceSteps),
       status: run.status,
     };
     this.state.history = [...this.state.history, newEntry];
