@@ -616,6 +616,7 @@ export const Canvas: React.FC = () => {
             node={node}
             isSelected={node.id === selectedNodeId}
             allNodes={nodes}
+            nodeTrace={traceMap.get(node.id)}
             onStartDrag={startDragNode}
             onPortMouseDown={startConnect}
           />
