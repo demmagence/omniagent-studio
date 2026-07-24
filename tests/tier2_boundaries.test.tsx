@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { graphStore } from '../src/store/graphStore';
 import { executeWorkflow } from '../src/services/executor';
+import * as api from '../src/services/api';
 import { callLLM } from '../src/services/api';
 import { deserializeGraph, hasCycle } from '../src/utils/graphUtils';
 
@@ -166,6 +167,7 @@ describe('Tier 2: Boundary & Edge Cases', () => {
   // Timeout
   it('executor throws error on timeout', async () => {
     graphStore.addNode('LLM');
+    vi.spyOn(api, 'callLLM').mockImplementation(() => new Promise(resolve => setTimeout(resolve, 10)) as never);
     vi.useFakeTimers();
     try {
       const run = executeWorkflow({ timeoutMs: 3, fallback: true });
@@ -179,6 +181,7 @@ describe('Tier 2: Boundary & Edge Cases', () => {
 
   it('executor marks unfinished nodes as failed on timeout', async () => {
     graphStore.addNode('LLM');
+    vi.spyOn(api, 'callLLM').mockImplementation(() => new Promise(resolve => setTimeout(resolve, 10)) as never);
     vi.useFakeTimers();
     try {
       const run = executeWorkflow({ timeoutMs: 3, fallback: true });
