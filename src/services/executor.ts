@@ -397,7 +397,6 @@ export async function executeWorkflow(options: ExecutionOptions = {}): Promise<T
       const node = nodeMap.get(nodeId);
       if (!node) return;
 
-      await new Promise(r => setTimeout(r, 5));
       if (aborted) return;
 
       graphStore.updateTraceStep({
