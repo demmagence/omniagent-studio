@@ -1,7 +1,37 @@
 import { describe, it, expect } from 'vitest';
 import { getWordFrequency, calculateCosineSimilarity } from '../src/services/executor';
+import { JSONPath } from '../src/services/executors/jsonPath';
+import { NodeExecutionContext } from '../src/services/executors/types';
 
 describe('executor utility functions', () => {
+  describe('JSONPath', () => {
+    it('should block access to __proto__', () => {
+      const nodeContext = {
+        node: { data: { jsonPath: '__proto__' } },
+        incomingInput: { a: 1 }
+      };
+      const result = JSONPath(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBeUndefined();
+    });
+
+    it('should block access to constructor', () => {
+      const nodeContext = {
+        node: { data: { jsonPath: 'constructor' } },
+        incomingInput: { a: 1 }
+      };
+      const result = JSONPath(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBeUndefined();
+    });
+
+    it('should block access to prototype', () => {
+      const nodeContext = {
+        node: { data: { jsonPath: 'prototype' } },
+        incomingInput: { a: 1 }
+      };
+      const result = JSONPath(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBeUndefined();
+    });
+  });
   describe('getWordFrequency', () => {
     it('should correctly count word frequencies in a basic string', () => {
       const text = 'hello world hello';
