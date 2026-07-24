@@ -151,6 +151,28 @@ describe('autoLayout', () => {
 });
 
 describe('deserializeGraph', () => {
+  it('should deserialize a valid graph with nodes and edges', () => {
+    const validGraph = {
+      nodes: [createNode('A'), createNode('B')],
+      edges: [createEdge('A', 'B')]
+    };
+    const jsonStr = JSON.stringify(validGraph);
+    const result = deserializeGraph(jsonStr);
+
+    expect(result.nodes).toHaveLength(2);
+    expect(result.edges).toHaveLength(1);
+    expect(result.nodes[0].id).toBe('A');
+    expect(result.edges[0].source).toBe('A');
+  });
+
+  it('should return empty arrays when nodes and edges are missing from valid JSON object', () => {
+    const jsonStr = JSON.stringify({});
+    const result = deserializeGraph(jsonStr);
+
+    expect(result.nodes).toEqual([]);
+    expect(result.edges).toEqual([]);
+  });
+
   it('should throw an error if nodes is not an array', () => {
     const jsonStr = JSON.stringify({ nodes: 'not an array', edges: [] });
     expect(() => deserializeGraph(jsonStr)).toThrow('Failed to deserialize graph: nodes must be an array');
