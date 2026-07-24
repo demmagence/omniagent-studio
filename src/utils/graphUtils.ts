@@ -110,8 +110,9 @@ export function autoLayout(
     }
   }
 
-  while (queue.length > 0) {
-    const u = queue.shift()!;
+  let head = 0;
+  while (head < queue.length) {
+    const u = queue[head++]!;
     const layer = layerMap.get(u)!;
     if (!layers[layer]) layers[layer] = [];
     layers[layer].push(u);
