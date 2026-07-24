@@ -1,3 +1,5 @@
+import ipaddr from 'ipaddr.js';
+
 export interface LLMResponse {
   text: string;
   tokensUsed: number;
@@ -29,43 +31,47 @@ export function validateEndpointUrl(endpoint: string): void {
   let isPrivate = false;
   let isLocal = false;
 
-  // Note: Since this is a client-side execution environment (browser), synchronous
-  // DNS resolution is not possible before the fetch call. We rely on string/regex
-  // validation for explicit IP addresses, and depend on the browser's
-  // Private Network Access (PNA) checks and CORS policies to mitigate DNS rebinding
-  // and custom domains resolving to local network IPs.
-
-  // 1. Check IPv4
-  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-  const match = hostname.match(ipv4Regex);
-
-  if (match) {
-    const p1 = parseInt(match[1], 10);
-    const p2 = parseInt(match[2], 10);
-    if (p1 === 10) isPrivate = true;
-    if (p1 === 172 && p2 >= 16 && p2 <= 31) isPrivate = true;
-    if (p1 === 192 && p2 === 168) isPrivate = true;
-    if (p1 === 169 && p2 === 254) isPrivate = true; // Cloud Metadata
-    if (p1 === 127 || p1 === 0) isLocal = true;
-  }
-
   if (hostname === 'localhost') isLocal = true;
 
-  // 2. Check IPv6
-  if (hostname.includes(':')) {
-    const ip6 = hostname.replace('[', '').replace(']', '');
-    if (ip6 === '::1' || ip6 === '::' || ip6 === '0:0:0:0:0:0:0:1') isLocal = true;
-    if (ip6.startsWith('fc') || ip6.startsWith('fd')) isPrivate = true;
-    if (ip6.startsWith('fe8') || ip6.startsWith('fe9') || ip6.startsWith('fea') || ip6.startsWith('feb')) isPrivate = true;
+  // Strip brackets for IPv6 parsing
+  let ipToParse = hostname;
+  if (ipToParse.startsWith('[') && ipToParse.endsWith(']')) {
+    ipToParse = ipToParse.slice(1, -1);
+  }
 
-    // AWS IPv6 metadata
-    if (ip6 === 'fd00:ec2::254') isPrivate = true;
+  if (ipaddr.isValid(ipToParse)) {
+    try {
+      let parsedIp = ipaddr.parse(ipToParse);
 
-    // Catch IPv4-mapped IPv6 that have been normalized to hex by URL constructor
-    // e.g., [::ffff:169.254.169.254] -> ::ffff:a9fe:a9fe
-    // e.g., [::127.0.0.1] -> ::7f00:1
-    if (ip6.includes('a9fe:a9fe')) isPrivate = true;
-    if (ip6.startsWith('::ffff:7f') || ip6.startsWith('::7f')) isLocal = true;
+      // If IPv4 mapped IPv6, unmap it to test the actual IPv4 address
+      if (parsedIp.kind() === 'ipv6') {
+        const ip6 = parsedIp as ipaddr.IPv6;
+        if (ip6.isIPv4MappedAddress()) {
+          parsedIp = ip6.toIPv4Address();
+        }
+      }
+
+      const range = parsedIp.range();
+
+      if (range === 'loopback' || range === 'unspecified') {
+        isLocal = true;
+      } else if (
+        range === 'private' ||
+        range === 'uniqueLocal' ||
+        range === 'linkLocal'
+      ) {
+        isPrivate = true;
+      }
+
+      // Check for specific AWS IPv6 metadata address or similar ranges
+      if (parsedIp.kind() === 'ipv6') {
+        const ip6Str = parsedIp.toNormalizedString();
+        if (ip6Str === 'fd00:ec2::254') isPrivate = true;
+      }
+
+    } catch (e) {
+      // Ignore parse errors, just means it's not a valid IP and will rely on DNS
+    }
   }
 
   // Disallow explicit metadata/private IPs

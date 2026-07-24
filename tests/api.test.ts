@@ -75,4 +75,27 @@ describe('validateEndpointUrl', () => {
     // IPv6 Loopback
     expect(() => validateEndpointUrl('http://[::1]:9090')).toThrow(errorMsg);
   });
+
+  it('should reject SSRF bypass attempts using alternate IP encodings', () => {
+    const errorMsgPrivate = 'Access to private network or metadata addresses is forbidden.';
+    const errorMsgLocal = /Localhost endpoints are restricted to specific ports/;
+
+    // Localhost bypasses (targeting port 80)
+    expect(() => validateEndpointUrl('http://0177.0.0.1')).toThrow(errorMsgLocal); // Octal 127.0.0.1
+    expect(() => validateEndpointUrl('http://0x7f.0.0.1')).toThrow(errorMsgLocal); // Hex 127.0.0.1
+    expect(() => validateEndpointUrl('http://2130706433')).toThrow(errorMsgLocal); // Decimal integer 127.0.0.1
+    expect(() => validateEndpointUrl('http://127.1')).toThrow(errorMsgLocal); // Shortened 127.0.0.1
+
+    // IPv4-mapped IPv6 pointing to localhost
+    expect(() => validateEndpointUrl('http://[::ffff:127.0.0.1]')).toThrow(errorMsgLocal);
+
+    // Cloud metadata bypasses (targeting 169.254.169.254)
+    expect(() => validateEndpointUrl('http://2852039166')).toThrow(errorMsgPrivate); // Integer 169.254.169.254
+    expect(() => validateEndpointUrl('http://0251.0376.0251.0376')).toThrow(errorMsgPrivate); // Octal
+    expect(() => validateEndpointUrl('http://0xa9fea9fe')).toThrow(errorMsgPrivate); // Hex
+    expect(() => validateEndpointUrl('http://0xa9.0xfe.0xa9.0xfe')).toThrow(errorMsgPrivate); // Dotted Hex
+
+    // IPv4-mapped IPv6 pointing to metadata
+    expect(() => validateEndpointUrl('http://[::ffff:169.254.169.254]')).toThrow(errorMsgPrivate);
+  });
 });
