@@ -55,8 +55,8 @@ export interface GraphState {
 export interface TraceStep {
   nodeId: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
-  input: any;
-  output: any;
+  input: unknown;
+  output: unknown;
   log?: string;
   tokensConsumed?: number;
 }
