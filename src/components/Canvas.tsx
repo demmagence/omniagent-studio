@@ -11,7 +11,7 @@ export const Canvas: React.FC = () => {
     }
     return map;
   }, [nodes]);
-  const traceMap = useMemo(() => new Map(traceSteps.map(t => [t.nodeId, t])), [traceSteps]);
+  const traceMap = useMemo(() => traceSteps.reduce((map, t) => map.set(t.nodeId, t), new Map()), [traceSteps]);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [activeConnection, setActiveConnection] = useState<{
@@ -618,7 +618,7 @@ export const Canvas: React.FC = () => {
             node={node}
             isSelected={node.id === selectedNodeId}
             allNodes={nodes}
-            nodeTrace={traceMap.get(node.id)}
+            nodeStatus={traceMap.get(node.id)?.status}
             onStartDrag={startDragNode}
             onPortMouseDown={startConnect}
           />

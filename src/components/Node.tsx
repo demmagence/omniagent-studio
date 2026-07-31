@@ -1,12 +1,12 @@
 import React from 'react';
-import { Node as NodeType, TraceStep } from '../types';
+import { Node as NodeType } from '../types';
 import { graphStore, useGraphStore } from '../store/graphStore';
 
 interface NodeProps {
   node: NodeType;
   isSelected: boolean;
   allNodes: NodeType[];
-  nodeTrace?: TraceStep;
+  nodeStatus?: string | null;
   onStartDrag?: (nodeId: string, e: React.MouseEvent) => void;
   onPortMouseDown?: (nodeId: string, portType: 'in' | 'out', e: React.MouseEvent) => void;
 }
@@ -15,15 +15,13 @@ export const Node: React.FC<NodeProps> = ({
   node,
   isSelected,
   allNodes,
-  nodeTrace,
+  nodeStatus,
   onStartDrag,
   onPortMouseDown
 }) => {
   const { selectedRunId } = useGraphStore();
   const isReplayMode = selectedRunId !== null;
   const [targetId, setTargetId] = React.useState('');
-
-  const nodeStatus = nodeTrace ? nodeTrace.status : null;
 
   const handleSelect = (e: React.MouseEvent) => {
     e.stopPropagation();
