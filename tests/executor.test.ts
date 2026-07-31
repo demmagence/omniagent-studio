@@ -1,9 +1,61 @@
 import { describe, it, expect } from 'vitest';
 import { getWordFrequency, calculateCosineSimilarity } from '../src/services/executor';
 import { JSONPath } from '../src/services/executors/jsonPath';
+import { VectorDB } from '../src/services/executors/vectorDB';
 import { NodeExecutionContext } from '../src/services/executors/types';
 
 describe('executor utility functions', () => {
+  describe('VectorDB', () => {
+    it('should correctly match documents based on similarity and sort them by highest similarity first', () => {
+      const nodeContext = {
+        node: { data: { documents: 'apple banana\norange\napple' } },
+        incomingInput: 'apple'
+      };
+      const result = VectorDB(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toEqual(['apple', 'apple banana', 'orange']);
+      expect(result.nodeInput).toBe('apple');
+      expect(result.tokensUsed).toBe(0);
+    });
+
+    it('should filter documents based on similarity threshold', () => {
+      const nodeContext = {
+        node: { data: { documents: 'apple banana\norange\napple', similarityThreshold: 0.6 } },
+        incomingInput: 'apple'
+      };
+      const result = VectorDB(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toEqual(['apple', 'apple banana']);
+    });
+
+    it('should handle non-string incomingInput by stringifying it', () => {
+      const nodeContext = {
+        node: { data: { documents: '{"search":"apple"}\norange' } },
+        incomingInput: { search: "apple" }
+      };
+      const result = VectorDB(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toEqual(['{"search":"apple"}', 'orange']);
+      expect(result.nodeInput).toBe('{"search":"apple"}');
+    });
+
+    it('should handle empty or undefined documents gracefully', () => {
+      const nodeContext = {
+        node: { data: {} },
+        incomingInput: 'apple'
+      };
+      const result = VectorDB(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toEqual([]);
+    });
+
+    it('should handle null/undefined incomingInput', () => {
+      const nodeContext = {
+        node: { data: { documents: 'apple\norange' } },
+        incomingInput: null
+      };
+      const result = VectorDB(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toEqual(['apple', 'orange']);
+      expect(result.nodeInput).toBe('');
+    });
+  });
+
   describe('JSONPath', () => {
     it('should block access to __proto__', () => {
       const nodeContext = {
