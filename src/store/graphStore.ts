@@ -35,8 +35,8 @@ const cloneEdges = (edges: Edge[]): Edge[] => {
 const cloneTraceSteps = (steps: TraceStep[]): TraceStep[] => {
   return steps.map(s => ({
     ...s,
-    input: s.input ? JSON.parse(JSON.stringify(s.input)) : s.input,
-    output: s.output ? JSON.parse(JSON.stringify(s.output)) : s.output,
+    input: s.input ? structuredClone(s.input) : s.input,
+    output: s.output ? structuredClone(s.output) : s.output,
   }));
 };
 
