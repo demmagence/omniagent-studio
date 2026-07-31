@@ -31,16 +31,28 @@ export function deserializeGraph(jsonStr: string): { nodes: Node[]; edges: Edge[
   }
 }
 
-export function hasCycle(nodes: Node[], edges: Edge[]): boolean {
+function computeInDegreeAndAdjList(nodes: Node[], edges: Edge[]) {
+  const inDegree = new Map<string, number>();
   const adjList = new Map<string, string[]>();
   for (const node of nodes) {
+    inDegree.set(node.id, 0);
     adjList.set(node.id, []);
   }
   for (const edge of edges) {
-    if (adjList.has(edge.source)) {
-      adjList.get(edge.source)!.push(edge.target);
+    const list = adjList.get(edge.source);
+    if (list) {
+      list.push(edge.target);
+    }
+    const degree = inDegree.get(edge.target);
+    if (degree !== undefined) {
+      inDegree.set(edge.target, degree + 1);
     }
   }
+  return { inDegree, adjList };
+}
+
+export function hasCycle(nodes: Node[], edges: Edge[]): boolean {
+  const { adjList } = computeInDegreeAndAdjList(nodes, edges);
 
   const visited = new Set<string>();
   const recStack = new Set<string>();
@@ -65,24 +77,6 @@ export function hasCycle(nodes: Node[], edges: Edge[]): boolean {
     if (dfs(node.id)) return true;
   }
   return false;
-}
-
-function computeInDegreeAndAdjList(nodes: Node[], edges: Edge[]) {
-  const inDegree = new Map<string, number>();
-  const adjList = new Map<string, string[]>();
-  for (const node of nodes) {
-    inDegree.set(node.id, 0);
-    adjList.set(node.id, []);
-  }
-  for (const edge of edges) {
-    if (adjList.has(edge.source)) {
-      adjList.get(edge.source)!.push(edge.target);
-    }
-    if (inDegree.has(edge.target)) {
-      inDegree.set(edge.target, inDegree.get(edge.target)! + 1);
-    }
-  }
-  return { inDegree, adjList };
 }
 
 function computeLayers(nodes: Node[], inDegree: Map<string, number>, adjList: Map<string, string[]>) {
