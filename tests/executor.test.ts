@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { getWordFrequency, calculateCosineSimilarity } from '../src/services/executor';
 import { JSONPath } from '../src/services/executors/jsonPath';
+import { Prompt } from '../src/services/executors/prompt';
 import { Output } from '../src/services/executors/output';
 import { NodeExecutionContext } from '../src/services/executors/types';
 
@@ -91,6 +92,70 @@ describe('executor utility functions', () => {
       expect(result.nodeOutput).toBeUndefined();
     });
   });
+
+  describe('Prompt', () => {
+    it('should leave template unmodified if incomingInput is null or undefined', () => {
+      const nodeContext = {
+        node: { data: { promptTemplate: 'Test {input}' } },
+        incomingInput: null
+      };
+      const result = Prompt(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe('Test {input}');
+
+      const nodeContext2 = {
+        node: { data: { promptTemplate: 'Test {input}' } },
+        incomingInput: undefined
+      };
+      const result2 = Prompt(nodeContext2 as any as NodeExecutionContext);
+      expect(result2.nodeOutput).toBe('Test {input}');
+    });
+
+    it('should handle empty promptTemplate and return empty string', () => {
+      const nodeContext = {
+        node: { data: {} },
+        incomingInput: 'test'
+      };
+      const result = Prompt(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe('');
+    });
+
+    it('should perform basic string replacement', () => {
+      const nodeContext = {
+        node: { data: { promptTemplate: 'Hello {input}' } },
+        incomingInput: 'World'
+      };
+      const result = Prompt(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe('Hello World');
+    });
+
+    it('should handle case-insensitive and multiple replacements', () => {
+      const nodeContext = {
+        node: { data: { promptTemplate: 'Value: {input}, {INPUT}' } },
+        incomingInput: '42'
+      };
+      const result = Prompt(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe('Value: 42, 42');
+    });
+
+    it('should handle object input by JSON stringifying', () => {
+      const nodeContext = {
+        node: { data: { promptTemplate: 'Data: {input}' } },
+        incomingInput: { key: 'value' }
+      };
+      const result = Prompt(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe('Data: {"key":"value"}');
+    });
+
+    it('should handle number input by stringifying', () => {
+      const nodeContext = {
+        node: { data: { promptTemplate: 'Count: {input}' } },
+        incomingInput: 10
+      };
+      const result = Prompt(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe('Count: 10');
+    });
+  });
+
   describe('getWordFrequency', () => {
     it('should correctly count word frequencies in a basic string', () => {
       const text = 'hello world hello';
