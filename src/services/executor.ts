@@ -35,12 +35,15 @@ class WorkflowExecutor {
     this.outputs = new Map<string, any>();
 
     this.incomingEdgesMap = new Map<string, Edge[]>();
-    for (const node of this.nodes) {
-      this.incomingEdgesMap.set(node.id, []);
-    }
     for (const edge of this.edges) {
-      if (this.incomingEdgesMap.has(edge.target)) {
-        this.incomingEdgesMap.get(edge.target)!.push(edge);
+      const target = edge.target;
+      if (this.nodeMap.has(target)) {
+        const edgeList = this.incomingEdgesMap.get(target);
+        if (edgeList) {
+          edgeList.push(edge);
+        } else {
+          this.incomingEdgesMap.set(target, [edge]);
+        }
       }
     }
 
