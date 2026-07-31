@@ -1,9 +1,75 @@
 import { describe, it, expect } from 'vitest';
 import { getWordFrequency, calculateCosineSimilarity } from '../src/services/executor';
 import { JSONPath } from '../src/services/executors/jsonPath';
+import { Router } from '../src/services/executors/router';
 import { NodeExecutionContext } from '../src/services/executors/types';
 
 describe('executor utility functions', () => {
+  describe('Router', () => {
+    it('should route to Error Branch for input containing "error"', () => {
+      const nodeContext = {
+        node: { data: { routingRules: 'active' } },
+        incomingInput: 'some error occurred'
+      };
+      const result = Router(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe('Error Branch');
+    });
+
+    it('should route to Error Branch case-insensitively for input containing "fail"', () => {
+      const nodeContext = {
+        node: { data: { routingRules: 'active' } },
+        incomingInput: 'FAILed task'
+      };
+      const result = Router(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe('Error Branch');
+    });
+
+    it('should route to Tool Branch for input containing "tool"', () => {
+      const nodeContext = {
+        node: { data: { routingRules: 'active' } },
+        incomingInput: 'use tool X'
+      };
+      const result = Router(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe('Tool Branch');
+    });
+
+    it('should route to Tool Branch for input containing "search"', () => {
+      const nodeContext = {
+        node: { data: { routingRules: 'active' } },
+        incomingInput: 'search web'
+      };
+      const result = Router(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe('Tool Branch');
+    });
+
+    it('should handle object inputs by stringifying them', () => {
+      const nodeContext = {
+        node: { data: { routingRules: 'active' } },
+        incomingInput: { msg: 'fail' }
+      };
+      const result = Router(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe('Error Branch');
+    });
+
+    it('should route to Default Route for unmatched inputs', () => {
+      const nodeContext = {
+        node: { data: { routingRules: 'active' } },
+        incomingInput: 'hello world'
+      };
+      const result = Router(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe('Default Route');
+    });
+
+    it('should route to Default Route if routingRules are empty', () => {
+      const nodeContext = {
+        node: { data: { routingRules: '' } },
+        incomingInput: 'error'
+      };
+      const result = Router(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe('Default Route');
+    });
+  });
+
   describe('JSONPath', () => {
     it('should block access to __proto__', () => {
       const nodeContext = {
