@@ -3,6 +3,7 @@ import { getWordFrequency, calculateCosineSimilarity } from '../src/services/exe
 import { JSONPath } from '../src/services/executors/jsonPath';
 import { Prompt } from '../src/services/executors/prompt';
 import { Router } from '../src/services/executors/router';
+import { VectorDB } from '../src/services/executors/vectorDB';
 import { Output } from '../src/services/executors/output';
 import { NodeExecutionContext } from '../src/services/executors/types';
 
@@ -69,6 +70,57 @@ describe('executor utility functions', () => {
       };
       const result = Router(nodeContext as any as NodeExecutionContext);
       expect(result.nodeOutput).toBe('Default Route');
+    });
+  });
+
+  describe('VectorDB', () => {
+    it('should correctly match documents based on similarity and sort them by highest similarity first', () => {
+      const nodeContext = {
+        node: { data: { documents: 'apple banana\norange\napple' } },
+        incomingInput: 'apple'
+      };
+      const result = VectorDB(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toEqual(['apple', 'apple banana', 'orange']);
+      expect(result.nodeInput).toBe('apple');
+      expect(result.tokensUsed).toBe(0);
+    });
+
+    it('should filter documents based on similarity threshold', () => {
+      const nodeContext = {
+        node: { data: { documents: 'apple banana\norange\napple', similarityThreshold: 0.6 } },
+        incomingInput: 'apple'
+      };
+      const result = VectorDB(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toEqual(['apple', 'apple banana']);
+    });
+
+    it('should handle non-string incomingInput by stringifying it', () => {
+      const nodeContext = {
+        node: { data: { documents: '{"search":"apple"}\norange' } },
+        incomingInput: { search: "apple" }
+      };
+      const result = VectorDB(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toEqual(['{"search":"apple"}', 'orange']);
+      expect(result.nodeInput).toBe('{"search":"apple"}');
+    });
+
+    it('should handle empty or undefined documents gracefully', () => {
+      const nodeContext = {
+        node: { data: {} },
+        incomingInput: 'apple'
+      };
+      const result = VectorDB(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toEqual([]);
+    });
+
+    it('should handle null/undefined incomingInput', () => {
+      const nodeContext = {
+        node: { data: { documents: 'apple\norange' } },
+        incomingInput: null
+      };
+      const result = VectorDB(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toEqual(['apple', 'orange']);
+      expect(result.nodeInput).toBe('');
     });
   });
 
