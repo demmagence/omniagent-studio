@@ -71,6 +71,7 @@ export function validateEndpointUrl(endpoint: string): void {
 
     } catch (e) {
       // Ignore parse errors, just means it's not a valid IP and will rely on DNS
+      console.debug('Failed to parse as IP, treating as hostname.', e);
     }
   }
 

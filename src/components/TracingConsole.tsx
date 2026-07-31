@@ -41,11 +41,17 @@ export const TracingConsole: React.FC = () => {
     }
   };
 
-  const totalTokens = traceSteps.reduce((acc, step) => acc + (step.tokensConsumed || 0), 0);
-  const completedCount = traceSteps.filter((s) => s.status === 'completed').length;
-  const failedCount = traceSteps.filter((s) => s.status === 'failed').length;
-  const pendingCount = traceSteps.filter((s) => s.status === 'pending').length;
-  const runningCount = traceSteps.filter((s) => s.status === 'running').length;
+  const { totalTokens, completedCount, failedCount, pendingCount, runningCount } = traceSteps.reduce(
+    (acc, step) => {
+      acc.totalTokens += step.tokensConsumed || 0;
+      if (step.status === 'completed') acc.completedCount++;
+      else if (step.status === 'failed') acc.failedCount++;
+      else if (step.status === 'pending') acc.pendingCount++;
+      else if (step.status === 'running') acc.runningCount++;
+      return acc;
+    },
+    { totalTokens: 0, completedCount: 0, failedCount: 0, pendingCount: 0, runningCount: 0 }
+  );
 
   const nodeMap = React.useMemo(() => {
     const map = new Map();
