@@ -18,11 +18,14 @@ export interface GraphStoreState {
 type Listener = (state: GraphStoreState) => void;
 
 const cloneNodes = (nodes: Node[]): Node[] => {
-  return nodes.map(n => ({
-    ...n,
-    position: { ...n.position },
-    data: { ...n.data },
-  }));
+  return nodes.map(n => {
+    const { apiKey, ...restData } = n.data;
+    return {
+      ...n,
+      position: { ...n.position },
+      data: restData,
+    };
+  });
 };
 
 const cloneEdges = (edges: Edge[]): Edge[] => {
