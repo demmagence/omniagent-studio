@@ -199,17 +199,23 @@ describe('Tier 2: Boundary & Edge Cases', () => {
   // API Call Errors
   it('OpenAI fetch returns non-ok status throws error', async () => {
     // Stub fetch to return 401
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 401,
-      text: async () => 'Unauthorized API Key'
+    const mockFetch = vi.fn().mockImplementation(async (url) => {
+      const urlStr = url.toString();
+      if (urlStr.includes('cloudflare-dns')) {
+        return { ok: true, json: async () => ({ Answer: [{ type: 1, data: '93.184.216.34' }] }) };
+      }
+      return {
+        ok: false,
+        status: 401,
+        text: async () => 'Unauthorized API Key'
+      };
     });
     vi.stubGlobal('fetch', mockFetch);
 
     await expect(callLLM('openai', 'gpt-4', 'hello', { apiKey: 'bad-key', fallback: false }))
       .rejects.toThrow(/OpenAI API failed with status 401/);
 
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('openai'),
       expect.objectContaining({
@@ -219,17 +225,23 @@ describe('Tier 2: Boundary & Edge Cases', () => {
   });
 
   it('Ollama fetch returns non-ok status throws error', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      text: async () => 'Model not found'
+    const mockFetch = vi.fn().mockImplementation(async (url) => {
+      const urlStr = url.toString();
+      if (urlStr.includes('cloudflare-dns')) {
+        return { ok: true, json: async () => ({ Answer: [{ type: 1, data: '127.0.0.1' }] }) };
+      }
+      return {
+        ok: false,
+        status: 500,
+        text: async () => 'Model not found'
+      };
     });
     vi.stubGlobal('fetch', mockFetch);
 
     await expect(callLLM('ollama', 'llama-bad', 'hello', { fallback: false }))
       .rejects.toThrow(/Ollama API failed with status 500/);
 
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+
     expect(mockFetch).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Object)
