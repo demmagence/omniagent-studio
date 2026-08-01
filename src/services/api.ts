@@ -13,8 +13,9 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
   }
 
   // Skip DoH resolution in tests to prevent hanging/failing tests unless specifically testing validation
-  if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test' && !process.env.TEST_VALIDATE_ENDPOINT) {
-    return;
+  const proc = (globalThis as any).process;
+  if (proc && proc.env && proc.env.NODE_ENV === 'test' && !proc.env.TEST_VALIDATE_ENDPOINT) {
+    return { isPrivate: false, isLocal: false };
   }
 
   const checkIp = (ipStr: string) => {

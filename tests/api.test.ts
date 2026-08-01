@@ -4,12 +4,13 @@ import { validateEndpointUrl } from '../src/services/api';
 import { vi } from 'vitest';
 
 describe('validateEndpointUrl', () => {
-  let originalFetch: typeof global.fetch;
+  let originalFetch: typeof globalThis.fetch;
 
   beforeAll(() => {
-    process.env.TEST_VALIDATE_ENDPOINT = '1';
-    originalFetch = global.fetch;
-    global.fetch = vi.fn().mockImplementation(async (url) => {
+    if (!(globalThis as any).process) (globalThis as any).process = { env: {} };
+    (globalThis as any).process.env.TEST_VALIDATE_ENDPOINT = '1';
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockImplementation(async (url) => {
       const urlStr = url.toString();
       if (urlStr.includes('cloudflare-dns')) {
         return { ok: true, json: async () => ({ Answer: [{ type: 1, data: '93.184.216.34' }] }) };
@@ -19,8 +20,8 @@ describe('validateEndpointUrl', () => {
   });
 
   afterAll(() => {
-    delete process.env.TEST_VALIDATE_ENDPOINT;
-    global.fetch = originalFetch;
+    delete (globalThis as any).process.env.TEST_VALIDATE_ENDPOINT;
+    globalThis.fetch = originalFetch;
   });
   it('should allow valid public URLs', async () => {
     await expect(validateEndpointUrl('https://api.openai.com')).resolves.not.toThrow();
