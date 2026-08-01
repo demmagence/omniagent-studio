@@ -1,33 +1,6 @@
 import ipaddr from 'ipaddr.js';
 
-export interface LLMResponse {
-  text: string;
-  tokensUsed: number;
-}
-
-export async function validateEndpointUrl(endpoint: string): Promise<void> {
-  let url: URL;
-  try {
-    url = new URL(endpoint);
-  } catch (err) {
-    throw new Error('Invalid endpoint URL format.');
-  }
-
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error('Endpoint URL must use http: or https: protocol.');
-  }
-
-  if (url.username || url.password) {
-    throw new Error('Endpoint URL must not contain credentials.');
-  }
-
-  let hostname = url.hostname.toLowerCase();
-
-  // Strip trailing dot to prevent bypasses like `localhost.`
-  if (hostname.endsWith('.')) {
-    hostname = hostname.slice(0, -1);
-  }
-
+async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; isLocal: boolean }> {
   let isPrivate = false;
   let isLocal = false;
 
@@ -107,6 +80,39 @@ export async function validateEndpointUrl(endpoint: string): Promise<void> {
       console.warn('DNS over HTTPS resolution failed', e);
     }
   }
+
+  return { isPrivate, isLocal };
+}
+
+export interface LLMResponse {
+  text: string;
+  tokensUsed: number;
+}
+
+export async function validateEndpointUrl(endpoint: string): Promise<void> {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch (err) {
+    throw new Error('Invalid endpoint URL format.');
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('Endpoint URL must use http: or https: protocol.');
+  }
+
+  if (url.username || url.password) {
+    throw new Error('Endpoint URL must not contain credentials.');
+  }
+
+  let hostname = url.hostname.toLowerCase();
+
+  // Strip trailing dot to prevent bypasses like `localhost.`
+  if (hostname.endsWith('.')) {
+    hostname = hostname.slice(0, -1);
+  }
+
+  const { isPrivate, isLocal } = await getNetworkType(hostname);
 
   // Disallow explicit metadata/private IPs
   if (isPrivate || hostname === '169.254.169.254') {

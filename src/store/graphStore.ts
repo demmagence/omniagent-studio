@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Node, Edge, TraceStep, NodeType, NodeData, RunHistoryEntry } from '../types';
+import { cloneNodes, cloneEdges, cloneTraceSteps } from './graphStoreHelpers';
 
 export interface GraphStoreState {
   nodes: Node[];
@@ -16,29 +17,6 @@ export interface GraphStoreState {
 }
 
 type Listener = (state: GraphStoreState) => void;
-
-const cloneNodes = (nodes: Node[]): Node[] => {
-  return nodes.map(n => {
-    const { apiKey, ...restData } = n.data;
-    return {
-      ...n,
-      position: { ...n.position },
-      data: restData,
-    };
-  });
-};
-
-const cloneEdges = (edges: Edge[]): Edge[] => {
-  return edges.map(e => ({ ...e }));
-};
-
-const cloneTraceSteps = (steps: TraceStep[]): TraceStep[] => {
-  return steps.map(s => ({
-    ...s,
-    input: s.input ? structuredClone(s.input) : s.input,
-    output: s.output ? structuredClone(s.output) : s.output,
-  }));
-};
 
 class GraphStore {
   private state: GraphStoreState = {
