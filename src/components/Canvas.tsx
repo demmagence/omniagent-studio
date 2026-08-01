@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useGraphStore, graphStore } from '../store/graphStore';
 import { Node } from './Node';
+import { WorkspaceControls } from './WorkspaceControls';
+import { ConnectionsPanel } from './ConnectionsPanel';
 
 export const Canvas: React.FC = () => {
-  const { nodes, edges, selectedNodeId, selectedRunId, canUndo, canRedo, traceSteps } = useGraphStore();
+  const { nodes, edges, selectedNodeId, selectedRunId, traceSteps } = useGraphStore();
   const nodeMap = useMemo(() => {
     const map = new Map<string, typeof nodes[0]>();
     for (const node of nodes) {
@@ -317,11 +319,6 @@ export const Canvas: React.FC = () => {
     setPan({ x: nextPanX, y: nextPanY });
   };
 
-  const handleRemoveEdge = (edgeId: string) => {
-    if (selectedRunId !== null) return;
-    graphStore.removeEdge(edgeId);
-  };
-
   const handleCanvasClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.getAttribute('data-testid') === 'canvas') {
@@ -354,162 +351,12 @@ export const Canvas: React.FC = () => {
         </p>
       </div>
 
-      {/* Floating Workspace Controls Overlay */}
-      <div
-        data-testid="workspace-controls-panel"
-        style={{
-          position: 'absolute',
-          top: '16px',
-          right: '16px',
-          zIndex: 10,
-          display: 'flex',
-          gap: '8px',
-          backgroundColor: 'rgba(31, 41, 55, 0.85)',
-          backdropFilter: 'blur(8px)',
-          border: '1px solid rgba(75, 85, 99, 0.5)',
-          borderRadius: '8px',
-          padding: '6px 10px',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
-          alignItems: 'center',
-        }}
-      >
-        {/* Zoom Controls */}
-        <button
-          data-testid="zoom-in-btn"
-          onClick={handleZoomIn}
-          title="Zoom In"
-          style={{
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: '#f3f4f6',
-            fontSize: '14px',
-            cursor: 'pointer',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            transition: 'background-color 0.2s',
-          }}
-          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(75, 85, 99, 0.4)')}
-          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-        >
-          ➕
-        </button>
-        <button
-          data-testid="zoom-out-btn"
-          onClick={handleZoomOut}
-          title="Zoom Out"
-          style={{
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: '#f3f4f6',
-            fontSize: '14px',
-            cursor: 'pointer',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            transition: 'background-color 0.2s',
-          }}
-          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(75, 85, 99, 0.4)')}
-          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-        >
-          ➖
-        </button>
-        <button
-          data-testid="reset-view-btn"
-          onClick={handleResetView}
-          title="Reset View (100%)"
-          style={{
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: '#f3f4f6',
-            fontSize: '12px',
-            cursor: 'pointer',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            transition: 'background-color 0.2s',
-            fontWeight: 'bold',
-          }}
-          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(75, 85, 99, 0.4)')}
-          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-        >
-          100%
-        </button>
-        <button
-          data-testid="fit-view-btn"
-          onClick={handleFitToScreen}
-          title="Fit to Screen"
-          style={{
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: '#f3f4f6',
-            fontSize: '12px',
-            cursor: 'pointer',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            transition: 'background-color 0.2s',
-            fontWeight: 'bold',
-          }}
-          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(75, 85, 99, 0.4)')}
-          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-        >
-          Fit
-        </button>
-
-        {/* Divider */}
-        <div style={{ width: '1px', height: '18px', backgroundColor: '#4b5563', margin: '0 4px' }} />
-
-        {/* Undo / Redo */}
-        <button
-          data-testid="undo-btn"
-          onClick={() => graphStore.undo()}
-          disabled={!canUndo || selectedRunId !== null}
-          title="Undo (Ctrl+Z)"
-          style={{
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: canUndo && selectedRunId === null ? '#3b82f6' : '#4b5563',
-            fontSize: '12px',
-            cursor: canUndo && selectedRunId === null ? 'pointer' : 'not-allowed',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            transition: 'background-color 0.2s, color 0.2s',
-            fontWeight: 'bold',
-            opacity: canUndo && selectedRunId === null ? 1 : 0.4,
-          }}
-          onMouseOver={(e) => {
-            if (canUndo && selectedRunId === null) {
-              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.15)';
-            }
-          }}
-          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-        >
-          ↶ Undo
-        </button>
-        <button
-          data-testid="redo-btn"
-          onClick={() => graphStore.redo()}
-          disabled={!canRedo || selectedRunId !== null}
-          title="Redo (Ctrl+Y / Ctrl+Shift+Z)"
-          style={{
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: canRedo && selectedRunId === null ? '#10b981' : '#4b5563',
-            fontSize: '12px',
-            cursor: canRedo && selectedRunId === null ? 'pointer' : 'not-allowed',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            transition: 'background-color 0.2s, color 0.2s',
-            fontWeight: 'bold',
-            opacity: canRedo && selectedRunId === null ? 1 : 0.4,
-          }}
-          onMouseOver={(e) => {
-            if (canRedo && selectedRunId === null) {
-              e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
-            }
-          }}
-          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-        >
-          Redo ↷
-        </button>
-      </div>
+      <WorkspaceControls
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onResetView={handleResetView}
+        onFitToScreen={handleFitToScreen}
+      />
 
       <div
         style={{
@@ -625,72 +472,7 @@ export const Canvas: React.FC = () => {
         ))}
       </div>
 
-      <div
-        style={{
-          position: 'absolute',
-          bottom: '16px',
-          left: '16px',
-          right: '16px',
-          zIndex: 10,
-          backgroundColor: 'rgba(31, 41, 55, 0.95)',
-          padding: '12px',
-          borderRadius: '8px',
-          border: '1px solid #374151',
-          maxHeight: '150px',
-          overflowY: 'auto'
-        }}
-      >
-        <h4 style={{ color: '#9ca3af', margin: '0 0 8px 0' }}>Connections (Edges)</h4>
-        {edges.length === 0 ? (
-          <p style={{ color: '#6b7280', fontSize: '12px' }}>No connections yet.</p>
-        ) : (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {edges.map((edge) => {
-              const srcNode = nodeMap.get(edge.source);
-              const tgtNode = nodeMap.get(edge.target);
-              const srcLabel = srcNode?.data.label || edge.source;
-              const tgtLabel = tgtNode?.data.label || edge.target;
-              return (
-                <li
-                  key={edge.id}
-                  data-testid={`edge-item-${edge.id}`}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    backgroundColor: '#111827',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    marginBottom: '4px',
-                    color: '#e5e7eb',
-                    fontSize: '12px'
-                  }}
-                >
-                  <span>{srcLabel} → {tgtLabel}</span>
-                  <button
-                    disabled={selectedRunId !== null}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveEdge(edge.id);
-                    }}
-                    data-testid={`delete-edge-${edge.id}`}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: selectedRunId !== null ? '#4b5563' : '#ef4444',
-                      cursor: selectedRunId !== null ? 'not-allowed' : 'pointer',
-                      fontWeight: 'bold',
-                      opacity: selectedRunId !== null ? 0.5 : 1
-                    }}
-                  >
-                    Remove
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+      <ConnectionsPanel edges={edges} nodeMap={nodeMap} />
     </div>
   );
 };
