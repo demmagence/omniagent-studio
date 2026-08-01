@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { validateEndpointUrl } from '../src/services/api';
 
 import { vi } from 'vitest';
