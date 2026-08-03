@@ -15,6 +15,9 @@ class WorkflowExecutor {
   private nodeMap: Map<string, Node>;
   private outputs: Map<string, any>;
   private incomingEdgesMap: Map<string, Edge[]>;
+  private outgoingEdgesMap: Map<string, Edge[]>;
+  private pendingDependencies: Map<string, number>;
+  private readyNodesQueue: Node[];
   private completedNodes: Set<string>;
   private runningNodes: Set<string>;
   private aborted: boolean;
@@ -35,14 +38,35 @@ class WorkflowExecutor {
     this.outputs = new Map<string, any>();
 
     this.incomingEdgesMap = new Map<string, Edge[]>();
+    this.outgoingEdgesMap = new Map<string, Edge[]>();
+    this.pendingDependencies = new Map<string, number>();
+    this.readyNodesQueue = [];
+
+    for (const node of this.nodes) {
+      this.pendingDependencies.set(node.id, 0);
+    }
+
     for (const edge of this.edges) {
       const target = edge.target;
+      const source = edge.source;
+
       if (this.nodeMap.has(target)) {
         const edgeList = this.incomingEdgesMap.get(target);
         if (edgeList) {
           edgeList.push(edge);
         } else {
           this.incomingEdgesMap.set(target, [edge]);
+        }
+
+        this.pendingDependencies.set(target, (this.pendingDependencies.get(target) || 0) + 1);
+      }
+
+      if (this.nodeMap.has(source)) {
+        const outEdgeList = this.outgoingEdgesMap.get(source);
+        if (outEdgeList) {
+          outEdgeList.push(edge);
+        } else {
+          this.outgoingEdgesMap.set(source, [edge]);
         }
       }
     }
@@ -121,15 +145,7 @@ class WorkflowExecutor {
       return;
     }
 
-    const readyNodes = this.nodes.filter(node => {
-      if (this.runningNodes.has(node.id) || this.completedNodes.has(node.id)) {
-        return false;
-      }
-      const incomingEdges = this.incomingEdgesMap.get(node.id) || [];
-      return incomingEdges.every(e => this.completedNodes.has(e.source));
-    });
-
-    if (readyNodes.length === 0 && this.runningNodes.size === 0) {
+    if (this.readyNodesQueue.length === 0 && this.runningNodes.size === 0) {
       if (this.completedNodes.size === this.nodes.length) {
         this.resolveRun(graphStore.getState().traceSteps);
         return;
@@ -142,9 +158,11 @@ class WorkflowExecutor {
       return;
     }
 
-    for (const node of readyNodes) {
-      if (this.runningNodes.size >= this.maxConcurrency) {
-        break;
+    while (this.readyNodesQueue.length > 0 && this.runningNodes.size < this.maxConcurrency) {
+      const node = this.readyNodesQueue.shift()!;
+
+      if (this.runningNodes.has(node.id) || this.completedNodes.has(node.id)) {
+        continue;
       }
 
       const nodeId = node.id;
@@ -153,6 +171,21 @@ class WorkflowExecutor {
       this.executeNode(nodeId).then(() => {
         this.runningNodes.delete(nodeId);
         this.completedNodes.add(nodeId);
+
+        const outEdges = this.outgoingEdgesMap.get(nodeId) || [];
+        for (const edge of outEdges) {
+          const target = edge.target;
+          if (this.nodeMap.has(target)) {
+            const currentDeps = this.pendingDependencies.get(target) || 0;
+            if (currentDeps > 0) {
+              this.pendingDependencies.set(target, currentDeps - 1);
+              if (currentDeps - 1 === 0) {
+                this.readyNodesQueue.push(this.nodeMap.get(target)!);
+              }
+            }
+          }
+        }
+
         this.checkAndRunNext();
       }).catch(err => {
         this.runningNodes.delete(nodeId);
@@ -226,6 +259,13 @@ class WorkflowExecutor {
     const runPromise = new Promise<TraceStep[]>((resolve, reject) => {
       this.resolveRun = resolve;
       this.rejectRun = reject;
+
+      for (const node of this.nodes) {
+        if ((this.pendingDependencies.get(node.id) || 0) === 0) {
+          this.readyNodesQueue.push(node);
+        }
+      }
+
       this.checkAndRunNext();
     });
 

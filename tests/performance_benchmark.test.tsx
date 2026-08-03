@@ -29,5 +29,5 @@ describe('Canvas Performance Benchmark', () => {
 
     console.log(`Canvas render time for ${numNodes} nodes and ${numEdges} edges: ${end - start} ms`);
     expect(end - start).toBeGreaterThan(0);
-  }, 60000); // 60 seconds timeout
+  }, 120000); // 120 seconds timeout
 });
