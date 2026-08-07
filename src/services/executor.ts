@@ -151,9 +151,12 @@ class WorkflowExecutor {
         return;
       }
 
-      const incompleteNodeIds = this.nodes
-        .filter(n => !this.completedNodes.has(n.id))
-        .map(n => n.id);
+      const incompleteNodeIds: string[] = [];
+      for (const n of this.nodes) {
+        if (!this.completedNodes.has(n.id)) {
+          incompleteNodeIds.push(n.id);
+        }
+      }
       this.rejectRun(new Error(`Workflow is stuck: no runnable nodes and no running nodes. Incomplete nodes: ${incompleteNodeIds.join(', ')}`));
       return;
     }
