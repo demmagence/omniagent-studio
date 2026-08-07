@@ -148,6 +148,41 @@ describe('autoLayout', () => {
     expect(result.get('B')).toEqual({ x: 80, y: 60 });
     expect(result.get('C')).toEqual({ x: 80, y: 220 });
   });
+
+  it('should handle a mix of connected and disconnected nodes', () => {
+    const nodes = [createNode('A'), createNode('B'), createNode('C'), createNode('D')];
+    // A -> B are connected, C and D are disconnected
+    const edges = [createEdge('A', 'B')];
+
+    const result = autoLayout(nodes, edges);
+
+    // Layer 0: A, C, D
+    // totalHeight = 2 * 160 = 320, offsetY = 60 - 160 = -100
+    // y0 = Math.max(20, -100) = 20
+    // y1 = Math.max(20, -100 + 160) = 60
+    // y2 = Math.max(20, -100 + 320) = 220
+    expect(result.get('A')).toEqual({ x: 80, y: 20 });
+    expect(result.get('C')).toEqual({ x: 80, y: 60 });
+    expect(result.get('D')).toEqual({ x: 80, y: 220 });
+
+    // Layer 1: B
+    expect(result.get('B')).toEqual({ x: 360, y: 60 });
+  });
+
+  it('should place unplaced nodes (e.g., disconnected components forming a cycle) in layer 0', () => {
+    const nodes = [createNode('A'), createNode('B')];
+    // A -> B -> A forms a cycle, meaning neither has in-degree 0
+    const edges = [createEdge('A', 'B'), createEdge('B', 'A')];
+
+    const result = autoLayout(nodes, edges);
+
+    // Both end up unplaced by the BFS and fall back to Layer 0
+    // totalHeight = 1 * 160 = 160, offsetY = 60 - 80 = -20
+    // y0 = Math.max(20, -20) = 20
+    // y1 = Math.max(20, -20 + 160) = 140
+    expect(result.get('A')).toEqual({ x: 80, y: 20 });
+    expect(result.get('B')).toEqual({ x: 80, y: 140 });
+  });
 });
 
 describe('deserializeGraph', () => {
