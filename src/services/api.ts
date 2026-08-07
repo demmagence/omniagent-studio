@@ -45,8 +45,8 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
 
         // Check for specific AWS IPv6 metadata address or similar ranges
         if (parsedIp.kind() === 'ipv6') {
-          const ip6Str = parsedIp.toNormalizedString();
-          if (ip6Str === 'fd00:ec2::254') isPrivate = true;
+          const awsIpv6Metadata = ipaddr.parse('fd00:ec2::254') as ipaddr.IPv6;
+          if ((parsedIp as ipaddr.IPv6).match(awsIpv6Metadata, 128)) isPrivate = true;
         }
       } catch (e) {
         // Ignore parse errors

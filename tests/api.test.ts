@@ -80,6 +80,7 @@ describe('validateEndpointUrl', () => {
     await expect(validateEndpointUrl('http://169.254.169.254')).rejects.toThrow(errorMsg);
     await expect(validateEndpointUrl('http://169.254.169.253')).rejects.toThrow(errorMsg);
     await expect(validateEndpointUrl('http://[fd00:ec2::254]')).rejects.toThrow(errorMsg);
+    await expect(validateEndpointUrl('http://[fd00:0ec2:0000:0000:0000:0000:0000:0254]')).rejects.toThrow(errorMsg);
   });
 
   it('should reject local network addresses with unallowed ports', async () => {
