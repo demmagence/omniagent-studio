@@ -1,5 +1,7 @@
 import ipaddr from 'ipaddr.js';
 
+const dnsCache = new Map<string, any[]>();
+
 async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; isLocal: boolean }> {
   let isPrivate = false;
   let isLocal = false;
@@ -60,13 +62,26 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
     // If it's a hostname, perform DNS resolution via DoH to check underlying IPs
     try {
       const resolveType = async (type: string) => {
+        const cacheKey = `${hostname}_${type}`;
+        if (dnsCache.has(cacheKey)) {
+          const cachedAnswer = dnsCache.get(cacheKey)!;
+          for (const record of cachedAnswer) {
+            if (record.type === 1 || record.type === 28) {
+              checkIp(record.data);
+            }
+          }
+          return;
+        }
+
         const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=${type}`, {
           headers: { accept: 'application/dns-json' },
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.Answer) {
-            for (const record of data.Answer) {
+          const answer = data.Answer || [];
+          dnsCache.set(cacheKey, answer);
+          if (answer) {
+            for (const record of answer) {
               if (record.type === 1 || record.type === 28) {
                 checkIp(record.data);
               }
