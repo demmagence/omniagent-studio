@@ -22,14 +22,16 @@ export const VectorDB = ({ node, incomingInput }: NodeExecutionContext): NodeExe
 
   const queryFreq = getWordFrequency(queryStr);
   const matches = docs
-    .map((doc: string) => {
+    .reduce((acc: { doc: string; similarity: number }[], doc: string) => {
       const docFreq = getWordFrequency(doc);
       const similarity = calculateCosineSimilarity(queryFreq, docFreq);
-      return { doc, similarity };
-    })
-    .filter((item: { doc: string, similarity: number }) => item.similarity >= threshold)
-    .sort((a: { similarity: number }, b: { similarity: number }) => b.similarity - a.similarity)
-    .map((item: { doc: string }) => item.doc);
+      if (similarity >= threshold) {
+        acc.push({ doc, similarity });
+      }
+      return acc;
+    }, [])
+    .sort((a, b) => b.similarity - a.similarity)
+    .map(item => item.doc);
 
   log += `. Found ${matches.length} matching documents.`;
 
