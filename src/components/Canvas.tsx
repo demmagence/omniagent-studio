@@ -326,6 +326,36 @@ export const Canvas: React.FC = () => {
     }
   };
 
+  const renderActiveConnection = () => {
+    if (!activeConnection) return null;
+
+    const srcNode = nodeMap.get(activeConnection.nodeId);
+    if (!srcNode) return null;
+
+    let x1, y1, x2, y2;
+    if (activeConnection.portType === 'out') {
+      x1 = srcNode.position.x + 200;
+      y1 = srcNode.position.y + 60;
+      x2 = activeConnection.currentX;
+      y2 = activeConnection.currentY;
+    } else {
+      x1 = activeConnection.currentX;
+      y1 = activeConnection.currentY;
+      x2 = srcNode.position.x;
+      y2 = srcNode.position.y + 60;
+    }
+
+    return (
+      <path
+        d={getBezierPath(x1, y1, x2, y2)}
+        fill="none"
+        stroke="#3b82f6"
+        strokeWidth={3}
+        strokeDasharray="4 4"
+      />
+    );
+  };
+
   return (
     <div
       ref={canvasRef}
@@ -430,33 +460,7 @@ export const Canvas: React.FC = () => {
             );
           })}
 
-          {activeConnection && (() => {
-            const srcNode = nodeMap.get(activeConnection.nodeId);
-            if (!srcNode) return null;
-
-            let x1, y1, x2, y2;
-            if (activeConnection.portType === 'out') {
-              x1 = srcNode.position.x + 200;
-              y1 = srcNode.position.y + 60;
-              x2 = activeConnection.currentX;
-              y2 = activeConnection.currentY;
-            } else {
-              x1 = activeConnection.currentX;
-              y1 = activeConnection.currentY;
-              x2 = srcNode.position.x;
-              y2 = srcNode.position.y + 60;
-            }
-
-            return (
-              <path
-                d={getBezierPath(x1, y1, x2, y2)}
-                fill="none"
-                stroke="#3b82f6"
-                strokeWidth={3}
-                strokeDasharray="4 4"
-              />
-            );
-          })()}
+          {renderActiveConnection()}
         </svg>
 
         {nodes.map((node) => (
