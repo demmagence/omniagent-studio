@@ -40,6 +40,15 @@ class GraphStore {
 
   private listeners = new Set<Listener>();
 
+  private traceStepIndex: Record<string, number> = {};
+
+  private rebuildTraceStepIndex() {
+    this.traceStepIndex = {};
+    for (let i = 0; i < this.state.traceSteps.length; i++) {
+      this.traceStepIndex[this.state.traceSteps[i].nodeId] = i;
+    }
+  }
+
   getState(): GraphStoreState {
     return this.state;
   }
@@ -179,12 +188,13 @@ class GraphStore {
 
   setTraceSteps(steps: TraceStep[]) {
     this.state.traceSteps = [...steps];
+    this.rebuildTraceStepIndex();
     this.emit();
   }
 
   updateTraceStep(step: Partial<TraceStep> & { nodeId: string }) {
-    const existingIndex = this.state.traceSteps.findIndex((s) => s.nodeId === step.nodeId);
-    if (existingIndex !== -1) {
+    const existingIndex = this.traceStepIndex[step.nodeId];
+    if (existingIndex !== undefined) {
       const newTraceSteps = [...this.state.traceSteps];
       newTraceSteps[existingIndex] = { ...newTraceSteps[existingIndex], ...step };
       this.state.traceSteps = newTraceSteps;
@@ -198,6 +208,7 @@ class GraphStore {
         tokensConsumed: step.tokensConsumed || 0,
       };
       this.state.traceSteps = [...this.state.traceSteps, newStep];
+      this.traceStepIndex[newStep.nodeId] = this.state.traceSteps.length - 1;
     }
     this.emit();
   }
@@ -236,6 +247,7 @@ class GraphStore {
         this.state.nodes = [...this.draft.nodes];
         this.state.edges = [...this.draft.edges];
         this.state.traceSteps = [...this.draft.traceSteps];
+        this.rebuildTraceStepIndex();
         this.draft = null;
       }
       this.state.selectedRunId = null;
@@ -252,6 +264,7 @@ class GraphStore {
         this.state.nodes = [...run.nodes];
         this.state.edges = [...run.edges];
         this.state.traceSteps = [...run.traceSteps];
+        this.rebuildTraceStepIndex();
         this.state.selectedRunId = runId;
       }
     }
@@ -283,6 +296,7 @@ class GraphStore {
     this.undoStack = [];
     this.redoStack = [];
     this.draft = null;
+    this.rebuildTraceStepIndex();
     this.emit();
   }
 }
