@@ -13,7 +13,7 @@ class WorkflowExecutor {
   private timeoutMs: number;
   private maxConcurrency: number;
   private nodeMap: Map<string, Node>;
-  private outputs: Map<string, any>;
+  private outputs: Map<string, unknown>;
   private incomingEdgesMap: Map<string, Edge[]>;
   private outgoingEdgesMap: Map<string, Edge[]>;
   private pendingDependencies: Map<string, number>;
@@ -24,7 +24,7 @@ class WorkflowExecutor {
   private firstError: Error | null;
   private abortController: AbortController;
   private resolveRun!: (value: TraceStep[]) => void;
-  private rejectRun!: (reason?: any) => void;
+  private rejectRun!: (reason?: unknown) => void;
 
   constructor(options: ExecutionOptions) {
     const { nodes, edges, isFallbackMode, maxConcurrency: storeMaxConcurrency } = graphStore.getState();
@@ -35,7 +35,7 @@ class WorkflowExecutor {
     this.maxConcurrency = options.maxConcurrency !== undefined ? options.maxConcurrency : storeMaxConcurrency;
 
     this.nodeMap = new Map<string, Node>(this.nodes.map(n => [n.id, n]));
-    this.outputs = new Map<string, any>();
+    this.outputs = new Map<string, unknown>();
 
     this.incomingEdgesMap = new Map<string, Edge[]>();
     this.outgoingEdgesMap = new Map<string, Edge[]>();
@@ -84,7 +84,7 @@ class WorkflowExecutor {
     if (incomingEdges.length === 1) {
       return this.outputs.get(incomingEdges[0].source);
     }
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
     incomingEdges.forEach((edge, idx) => {
       const sourceNode = this.nodeMap.get(edge.source);
       const key = edge.sourcePort || sourceNode?.data.label || `input_${idx}`;

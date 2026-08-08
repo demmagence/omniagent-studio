@@ -2,7 +2,7 @@ import { NodeExecutionContext, NodeExecutionResult } from './types';
 
 export const Tool = ({ node, incomingInput }: NodeExecutionContext): NodeExecutionResult => {
   const toolName = node.data.toolName || 'calculator';
-  let nodeOutput: any;
+  let nodeOutput: unknown;
 
   if (toolName === 'calculator') {
     const val = typeof incomingInput === 'string' ? incomingInput : String(incomingInput || '');

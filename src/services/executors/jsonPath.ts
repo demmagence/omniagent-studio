@@ -1,7 +1,7 @@
 import { NodeExecutionContext, NodeExecutionResult } from './types';
 
 export const JSONPath = ({ node, incomingInput }: NodeExecutionContext): NodeExecutionResult => {
-  let parsedInput: any = incomingInput;
+  let parsedInput: unknown = incomingInput;
   if (typeof incomingInput === 'string') {
     try {
       parsedInput = JSON.parse(incomingInput);
@@ -35,7 +35,7 @@ export const JSONPath = ({ node, incomingInput }: NodeExecutionContext): NodeExe
           continue;
         }
       }
-      current = current[key];
+      current = (current as Record<string, unknown>)[key];
     }
   }
 
