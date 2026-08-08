@@ -137,6 +137,18 @@ class WorkflowExecutor {
     });
   }
 
+  private updateTargetDependencies(target: string) {
+    if (this.nodeMap.has(target)) {
+      const currentDeps = this.pendingDependencies.get(target) || 0;
+      if (currentDeps > 0) {
+        this.pendingDependencies.set(target, currentDeps - 1);
+        if (currentDeps - 1 === 0) {
+          this.readyNodesQueue.push(this.nodeMap.get(target)!);
+        }
+      }
+    }
+  }
+
   private checkAndRunNext() {
     if (this.aborted) return;
 
@@ -177,16 +189,7 @@ class WorkflowExecutor {
 
         const outEdges = this.outgoingEdgesMap.get(nodeId) || [];
         for (const edge of outEdges) {
-          const target = edge.target;
-          if (this.nodeMap.has(target)) {
-            const currentDeps = this.pendingDependencies.get(target) || 0;
-            if (currentDeps > 0) {
-              this.pendingDependencies.set(target, currentDeps - 1);
-              if (currentDeps - 1 === 0) {
-                this.readyNodesQueue.push(this.nodeMap.get(target)!);
-              }
-            }
-          }
+          this.updateTargetDependencies(edge.target);
         }
 
         this.checkAndRunNext();
