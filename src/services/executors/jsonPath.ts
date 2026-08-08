@@ -28,14 +28,23 @@ export const JSONPath = ({ node, incomingInput }: NodeExecutionContext): NodeExe
         current = undefined;
         break;
       }
+
+      let nextValue = undefined;
+
       if (Array.isArray(current)) {
         const idx = parseInt(key, 10);
-        if (!isNaN(idx)) {
-          current = current[idx];
-          continue;
+        if (!isNaN(idx) && String(idx) === key) {
+          nextValue = current[idx];
+        } else if (key === 'length') {
+          nextValue = current.length;
+        }
+      } else if (typeof current === 'object' || typeof current === 'string') {
+        if (Object.prototype.hasOwnProperty.call(current, key)) {
+          nextValue = (current as any)[key];
         }
       }
-      current = current[key];
+
+      current = nextValue;
     }
   }
 

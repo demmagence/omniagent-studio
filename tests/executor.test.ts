@@ -209,6 +209,42 @@ describe('executor utility functions', () => {
       const result = JSONPath(nodeContext as any as NodeExecutionContext);
       expect(result.nodeOutput).toBeUndefined();
     });
+
+    it('should block access to inherited Object methods like toString', () => {
+      const nodeContext = {
+        node: { data: { jsonPath: 'toString' } },
+        incomingInput: { a: 1 }
+      };
+      const result = JSONPath(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBeUndefined();
+    });
+
+    it('should block access to inherited Array methods like push', () => {
+      const nodeContext = {
+        node: { data: { jsonPath: 'push' } },
+        incomingInput: [1, 2, 3]
+      };
+      const result = JSONPath(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBeUndefined();
+    });
+
+    it('should allow access to Array length', () => {
+      const nodeContext = {
+        node: { data: { jsonPath: 'length' } },
+        incomingInput: [1, 2, 3]
+      };
+      const result = JSONPath(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBe(3);
+    });
+
+    it('should safely block complex prototype pollution paths', () => {
+      const nodeContext = {
+        node: { data: { jsonPath: '$["constructor"]["prototype"]' } },
+        incomingInput: '{"a": 1}'
+      };
+      const result = JSONPath(nodeContext as any as NodeExecutionContext);
+      expect(result.nodeOutput).toBeUndefined();
+    });
   });
 
   describe('Prompt', () => {
