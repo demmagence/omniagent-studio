@@ -8,11 +8,11 @@ describe('graphStoreHelpers', () => {
       const inputNodes: Node[] = [
         {
           id: 'node1',
-          type: 'llm',
+          type: 'LLM',
           position: { x: 100, y: 200 },
           data: {
             label: 'Test Node',
-            type: 'llm',
+            type: 'LLM',
             apiKey: 'secret-123',
             model: 'gpt-4',
           },
@@ -26,13 +26,13 @@ describe('graphStoreHelpers', () => {
       expect(clonedNodes[0].position).not.toBe(inputNodes[0].position); // Ensure deep clone for position
 
       expect(clonedNodes[0].id).toBe('node1');
-      expect(clonedNodes[0].type).toBe('llm');
+      expect(clonedNodes[0].type).toBe('LLM');
       expect(clonedNodes[0].position).toEqual({ x: 100, y: 200 });
 
       // Ensure apiKey is removed but other data remains
       expect(clonedNodes[0].data).toEqual({
         label: 'Test Node',
-        type: 'llm',
+        type: 'LLM',
         model: 'gpt-4',
       });
       expect('apiKey' in clonedNodes[0].data).toBe(false);
@@ -42,11 +42,11 @@ describe('graphStoreHelpers', () => {
       const inputNodes: Node[] = [
         {
           id: 'node2',
-          type: 'prompt',
+          type: 'Prompt',
           position: { x: 0, y: 0 },
           data: {
             label: 'Prompt Node',
-            type: 'prompt',
+            type: 'Prompt',
             promptTemplate: 'Hello',
           },
         },
@@ -56,7 +56,7 @@ describe('graphStoreHelpers', () => {
 
       expect(clonedNodes[0].data).toEqual({
         label: 'Prompt Node',
-        type: 'prompt',
+        type: 'Prompt',
         promptTemplate: 'Hello',
       });
     });
@@ -92,7 +92,7 @@ describe('graphStoreHelpers', () => {
 
   describe('cloneTraceSteps', () => {
     it('should clone trace steps and deeply clone input/output', () => {
-      const inputSteps: TraceStep[] = [
+      const inputSteps: (TraceStep & { id?: string; startTime?: number; endTime?: number })[] = [
         {
           id: 't1',
           nodeId: 'n1',
@@ -117,13 +117,13 @@ describe('graphStoreHelpers', () => {
     });
 
     it('should handle trace steps without input/output', () => {
-      const inputSteps: TraceStep[] = [
+      const inputSteps = [
         {
           id: 't2',
           nodeId: 'n2',
           status: 'running',
           startTime: 12345,
-        },
+        } as unknown as TraceStep & { id?: string; startTime?: number; endTime?: number },
       ];
 
       const clonedSteps = cloneTraceSteps(inputSteps);
@@ -134,7 +134,7 @@ describe('graphStoreHelpers', () => {
     });
 
     it('should handle trace steps with null input/output', () => {
-       const inputSteps: TraceStep[] = [
+       const inputSteps: (TraceStep & { id?: string; startTime?: number; endTime?: number })[] = [
         {
           id: 't3',
           nodeId: 'n3',
