@@ -61,15 +61,19 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
   } else if (hostname !== 'localhost') {
     // If it's a hostname, perform DNS resolution via DoH to check underlying IPs
     try {
+      const processRecords = (records: any[]) => {
+        for (const record of records) {
+          if (record.type === 1 || record.type === 28) {
+            checkIp(record.data);
+          }
+        }
+      };
+
       const resolveType = async (type: string) => {
         const cacheKey = `${hostname}_${type}`;
         if (dnsCache.has(cacheKey)) {
           const cachedAnswer = dnsCache.get(cacheKey)!;
-          for (const record of cachedAnswer) {
-            if (record.type === 1 || record.type === 28) {
-              checkIp(record.data);
-            }
-          }
+          processRecords(cachedAnswer);
           return;
         }
 
@@ -81,11 +85,7 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
           const answer = data.Answer || [];
           dnsCache.set(cacheKey, answer);
           if (answer) {
-            for (const record of answer) {
-              if (record.type === 1 || record.type === 28) {
-                checkIp(record.data);
-              }
-            }
+            processRecords(answer);
           }
         }
       };
