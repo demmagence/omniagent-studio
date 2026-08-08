@@ -265,6 +265,87 @@ export const Canvas: React.FC = () => {
     return `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
   };
 
+  const renderEdges = () => {
+    return edges.map((edge) => {
+      const srcNode = nodeMap.get(edge.source);
+      const tgtNode = nodeMap.get(edge.target);
+      if (!srcNode || !tgtNode) return null;
+
+      const x1 = srcNode.position.x + 200;
+      const y1 = srcNode.position.y + 60;
+      const x2 = tgtNode.position.x;
+      const y2 = tgtNode.position.y + 60;
+
+      const trace = traceMap.get(srcNode.id);
+      const status = trace ? trace.status : null;
+
+      let strokeColor = '#4b5563';
+      let className = '';
+
+      if (status === 'running') {
+        strokeColor = '#3b82f6';
+        className = 'edge-flow-running';
+      } else if (status === 'completed') {
+        strokeColor = '#10b981';
+        className = 'edge-pulse-completed';
+      } else if (status === 'failed') {
+        strokeColor = '#ef4444';
+      }
+
+      const bezierPath = getBezierPath(x1, y1, x2, y2);
+
+      return (
+        <g key={edge.id} data-testid={`edge-group-${edge.id}`}>
+          <path
+            d={bezierPath}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth={5}
+            opacity={status === 'running' ? 0.3 : 0.15}
+          />
+          <path
+            d={bezierPath}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth={3}
+            className={className}
+            style={{ transition: 'stroke 0.3s ease' }}
+          />
+        </g>
+      );
+    });
+  };
+
+  const renderActiveConnection = () => {
+    if (!activeConnection) return null;
+
+    const srcNode = nodeMap.get(activeConnection.nodeId);
+    if (!srcNode) return null;
+
+    let x1, y1, x2, y2;
+    if (activeConnection.portType === 'out') {
+      x1 = srcNode.position.x + 200;
+      y1 = srcNode.position.y + 60;
+      x2 = activeConnection.currentX;
+      y2 = activeConnection.currentY;
+    } else {
+      x1 = activeConnection.currentX;
+      y1 = activeConnection.currentY;
+      x2 = srcNode.position.x;
+      y2 = srcNode.position.y + 60;
+    }
+
+    return (
+      <path
+        d={getBezierPath(x1, y1, x2, y2)}
+        fill="none"
+        stroke="#3b82f6"
+        strokeWidth={3}
+        strokeDasharray="4 4"
+      />
+    );
+  };
+
   const handleZoomIn = () => {
     setZoom((z) => Math.min(3, z * 1.15));
   };
@@ -381,82 +462,8 @@ export const Canvas: React.FC = () => {
             pointerEvents: 'none'
           }}
         >
-          {edges.map((edge) => {
-            const srcNode = nodeMap.get(edge.source);
-            const tgtNode = nodeMap.get(edge.target);
-            if (!srcNode || !tgtNode) return null;
-
-            const x1 = srcNode.position.x + 200;
-            const y1 = srcNode.position.y + 60;
-            const x2 = tgtNode.position.x;
-            const y2 = tgtNode.position.y + 60;
-
-            const trace = traceMap.get(srcNode.id);
-            const status = trace ? trace.status : null;
-
-            let strokeColor = '#4b5563';
-            let className = '';
-
-            if (status === 'running') {
-              strokeColor = '#3b82f6';
-              className = 'edge-flow-running';
-            } else if (status === 'completed') {
-              strokeColor = '#10b981';
-              className = 'edge-pulse-completed';
-            } else if (status === 'failed') {
-              strokeColor = '#ef4444';
-            }
-
-            const bezierPath = getBezierPath(x1, y1, x2, y2);
-
-            return (
-              <g key={edge.id} data-testid={`edge-group-${edge.id}`}>
-                <path
-                  d={bezierPath}
-                  fill="none"
-                  stroke={strokeColor}
-                  strokeWidth={5}
-                  opacity={status === 'running' ? 0.3 : 0.15}
-                />
-                <path
-                  d={bezierPath}
-                  fill="none"
-                  stroke={strokeColor}
-                  strokeWidth={3}
-                  className={className}
-                  style={{ transition: 'stroke 0.3s ease' }}
-                />
-              </g>
-            );
-          })}
-
-          {activeConnection && (() => {
-            const srcNode = nodeMap.get(activeConnection.nodeId);
-            if (!srcNode) return null;
-
-            let x1, y1, x2, y2;
-            if (activeConnection.portType === 'out') {
-              x1 = srcNode.position.x + 200;
-              y1 = srcNode.position.y + 60;
-              x2 = activeConnection.currentX;
-              y2 = activeConnection.currentY;
-            } else {
-              x1 = activeConnection.currentX;
-              y1 = activeConnection.currentY;
-              x2 = srcNode.position.x;
-              y2 = srcNode.position.y + 60;
-            }
-
-            return (
-              <path
-                d={getBezierPath(x1, y1, x2, y2)}
-                fill="none"
-                stroke="#3b82f6"
-                strokeWidth={3}
-                strokeDasharray="4 4"
-              />
-            );
-          })()}
+          {renderEdges()}
+          {renderActiveConnection()}
         </svg>
 
         {nodes.map((node) => (
