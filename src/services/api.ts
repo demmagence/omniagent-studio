@@ -1,6 +1,6 @@
 import ipaddr from 'ipaddr.js';
 
-const dnsCache = new Map<string, any[]>();
+const dnsCache = new Map<string, { type: number; data: string }[]>();
 
 async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; isLocal: boolean }> {
   let isPrivate = false;
@@ -15,7 +15,7 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
   }
 
   // Skip DoH resolution in tests to prevent hanging/failing tests unless specifically testing validation
-  const proc = (globalThis as any).process;
+  const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
   if (proc && proc.env && proc.env.NODE_ENV === 'test' && !proc.env.TEST_VALIDATE_ENDPOINT) {
     return { isPrivate: false, isLocal: false };
   }
