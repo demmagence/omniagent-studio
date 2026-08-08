@@ -1,108 +1,66 @@
 import ipaddr from 'ipaddr.js';
-
-const dnsCache = new Map<string, any[]>();
-
-async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; isLocal: boolean }> {
-  let isPrivate = false;
-  let isLocal = false;
-
-  if (hostname === 'localhost') isLocal = true;
-
-  // Strip brackets for IPv6 parsing
-  let ipToParse = hostname;
-  if (ipToParse.startsWith('[') && ipToParse.endsWith(']')) {
-    ipToParse = ipToParse.slice(1, -1);
-  }
-
-  // Skip DoH resolution in tests to prevent hanging/failing tests unless specifically testing validation
-  const proc = (globalThis as any).process;
-  if (proc && proc.env && proc.env.NODE_ENV === 'test' && !proc.env.TEST_VALIDATE_ENDPOINT) {
-    return { isPrivate: false, isLocal: false };
-  }
-
-  const checkIp = (ipStr: string) => {
-    if (ipaddr.isValid(ipStr)) {
-      try {
-        let parsedIp = ipaddr.parse(ipStr);
-
-        // If IPv4 mapped IPv6, unmap it to test the actual IPv4 address
-        if (parsedIp.kind() === 'ipv6') {
-          const ip6 = parsedIp as ipaddr.IPv6;
-          if (ip6.isIPv4MappedAddress()) {
-            parsedIp = ip6.toIPv4Address();
-          }
-        }
-
-        const range = parsedIp.range();
-
-        if (range === 'loopback' || range === 'unspecified') {
-          isLocal = true;
-        } else if (
-          range === 'private' ||
-          range === 'uniqueLocal' ||
-          range === 'linkLocal'
-        ) {
-          isPrivate = true;
-        }
-
-        // Check for specific AWS IPv6 metadata address or similar ranges
-        if (parsedIp.kind() === 'ipv6') {
-          const awsIpv6Metadata = ipaddr.parse('fd00:ec2::254') as ipaddr.IPv6;
-          if ((parsedIp as ipaddr.IPv6).match(awsIpv6Metadata, 128)) isPrivate = true;
-        }
-      } catch (e) {
-        // Ignore parse errors
-      }
-    }
-  };
-
-  if (ipaddr.isValid(ipToParse)) {
-    checkIp(ipToParse);
-  } else if (hostname !== 'localhost') {
-    // If it's a hostname, perform DNS resolution via DoH to check underlying IPs
-    try {
-      const resolveType = async (type: string) => {
-        const cacheKey = `${hostname}_${type}`;
-        if (dnsCache.has(cacheKey)) {
-          const cachedAnswer = dnsCache.get(cacheKey)!;
-          for (const record of cachedAnswer) {
-            if (record.type === 1 || record.type === 28) {
-              checkIp(record.data);
-            }
-          }
-          return;
-        }
-
-        const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=${type}`, {
-          headers: { accept: 'application/dns-json' },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const answer = data.Answer || [];
-          dnsCache.set(cacheKey, answer);
-          if (answer) {
-            for (const record of answer) {
-              if (record.type === 1 || record.type === 28) {
-                checkIp(record.data);
-              }
-            }
-          }
-        }
-      };
-
-      // Check both A and AAAA records
-      await Promise.all([resolveType('A'), resolveType('AAAA')]);
-    } catch (e) {
-      console.warn('DNS over HTTPS resolution failed', e);
-    }
-  }
-
-  return { isPrivate, isLocal };
-}
+import http from 'http';
+import https from 'https';
+import dns from 'dns';
 
 export interface LLMResponse {
   text: string;
   tokensUsed: number;
+}
+
+function validateIpAddress(ipStr: string, port: string): void {
+  let isPrivate = false;
+  let isLocal = false;
+
+  if (ipStr === 'localhost') isLocal = true;
+
+  let ipToParse = ipStr;
+  if (ipToParse.startsWith('[') && ipToParse.endsWith(']')) {
+    ipToParse = ipToParse.slice(1, -1);
+  }
+
+  if (ipaddr.isValid(ipToParse)) {
+    try {
+      let parsedIp = ipaddr.parse(ipToParse);
+
+      if (parsedIp.kind() === 'ipv6') {
+        const ip6 = parsedIp as ipaddr.IPv6;
+        if (ip6.isIPv4MappedAddress()) {
+          parsedIp = ip6.toIPv4Address();
+        }
+      }
+
+      const range = parsedIp.range();
+
+      if (range === 'loopback' || range === 'unspecified') {
+        isLocal = true;
+      } else if (
+        range === 'private' ||
+        range === 'uniqueLocal' ||
+        range === 'linkLocal'
+      ) {
+        isPrivate = true;
+      }
+
+      if (parsedIp.kind() === 'ipv6') {
+        const awsIpv6Metadata = ipaddr.parse('fd00:ec2::254') as ipaddr.IPv6;
+        if ((parsedIp as ipaddr.IPv6).match(awsIpv6Metadata, 128)) isPrivate = true;
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  }
+
+  if (isPrivate || ipToParse === '169.254.169.254') {
+    throw new Error('Access to private network or metadata addresses is forbidden.');
+  }
+
+  if (isLocal) {
+    const allowedPorts = ['11434', '1234', '8000', '8080'];
+    if (!allowedPorts.includes(port)) {
+      throw new Error(`Localhost endpoints are restricted to specific ports (e.g., 11434).`);
+    }
+  }
 }
 
 export async function validateEndpointUrl(endpoint: string): Promise<void> {
@@ -122,26 +80,96 @@ export async function validateEndpointUrl(endpoint: string): Promise<void> {
   }
 
   let hostname = url.hostname.toLowerCase();
-
-  // Strip trailing dot to prevent bypasses like `localhost.`
   if (hostname.endsWith('.')) {
     hostname = hostname.slice(0, -1);
   }
 
-  const { isPrivate, isLocal } = await getNetworkType(hostname);
+  const proc = (globalThis as any).process;
+  const skipValidation = proc && proc.env && proc.env.NODE_ENV === 'test' && !proc.env.TEST_VALIDATE_ENDPOINT;
 
-  // Disallow explicit metadata/private IPs
-  if (isPrivate || hostname === '169.254.169.254') {
-    throw new Error('Access to private network or metadata addresses is forbidden.');
-  }
-
-  // Prevent arbitrary local loopback access, allow only specific AI inference ports
-  if (isLocal) {
-    const allowedPorts = ['11434', '1234', '8000', '8080'];
-    if (!allowedPorts.includes(url.port)) {
-      throw new Error(`Localhost endpoints are restricted to specific ports (e.g., 11434).`);
+  if (!skipValidation) {
+    // If it's already an IP or localhost, validate immediately.
+    // Otherwise, validation happens at connection time via safeFetch's lookup interceptor.
+    if (hostname === 'localhost' || ipaddr.isValid(hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname)) {
+      validateIpAddress(hostname, url.port);
     }
   }
+}
+
+async function safeFetch(urlStr: string, options: any): Promise<any> {
+  const proc = (globalThis as any).process;
+  const skipValidation = proc && proc.env && proc.env.NODE_ENV === 'test' && !proc.env.TEST_VALIDATE_ENDPOINT;
+
+  if (skipValidation) {
+    return globalThis.fetch(urlStr, options);
+  }
+
+  return new Promise((resolve, reject) => {
+    let url: URL;
+    try {
+      url = new URL(urlStr);
+    } catch (err) {
+      return reject(new Error('Invalid URL'));
+    }
+
+    let hostname = url.hostname.toLowerCase();
+    if (hostname.endsWith('.')) {
+      hostname = hostname.slice(0, -1);
+    }
+
+    const requestOptions: any = {
+      method: options.method || 'GET',
+      headers: options.headers,
+      signal: options.signal
+    };
+
+    requestOptions.lookup = (lookupHostname: string, dnsOptions: any, callback: any) => {
+      dns.lookup(lookupHostname, dnsOptions, (err: NodeJS.ErrnoException | null, address: string, family: number) => {
+        if (err) return callback(err);
+        try {
+          validateIpAddress(address, url.port);
+        } catch (validationErr) {
+          return callback(validationErr);
+        }
+        callback(null, address, family);
+      });
+    };
+
+    const lib = url.protocol === 'https:' ? https : http;
+    const req = lib.request(url, requestOptions, (res: http.IncomingMessage) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+      res.on('end', () => {
+        const bodyBuffer = Buffer.concat(chunks);
+        const bodyText = bodyBuffer.toString('utf-8');
+
+        const response = {
+          ok: res.statusCode && res.statusCode >= 200 && res.statusCode < 300,
+          status: res.statusCode,
+          text: async () => bodyText,
+          json: async () => {
+            if (!bodyText) return {};
+            return JSON.parse(bodyText);
+          }
+        };
+        resolve(response);
+      });
+    });
+
+    req.on('error', reject);
+    if (options.signal) {
+      options.signal.addEventListener('abort', () => {
+        req.destroy(new Error('AbortError'));
+      });
+    }
+
+    if (options.body) {
+      req.write(options.body);
+    }
+    req.end();
+  });
 }
 
 export async function callLLM(
@@ -173,7 +201,7 @@ export async function callLLM(
   await validateEndpointUrl(endpoint);
 
   if (provider === 'openai') {
-    const response = await fetch(endpoint, {
+    const response = await safeFetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -200,7 +228,7 @@ export async function callLLM(
     return { text, tokensUsed };
   } else {
     // Ollama
-    const response = await fetch(endpoint, {
+    const response = await safeFetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
