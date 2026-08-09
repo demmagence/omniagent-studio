@@ -4,6 +4,25 @@ import { Node } from './Node';
 import { WorkspaceControls } from './WorkspaceControls';
 import { ConnectionsPanel } from './ConnectionsPanel';
 
+const getEdgeStyle = (status: string | null) => {
+  let strokeColor = '#4b5563';
+  let className = '';
+  let opacity = 0.15;
+
+  if (status === 'running') {
+    strokeColor = '#3b82f6';
+    className = 'edge-flow-running';
+    opacity = 0.3;
+  } else if (status === 'completed') {
+    strokeColor = '#10b981';
+    className = 'edge-pulse-completed';
+  } else if (status === 'failed') {
+    strokeColor = '#ef4444';
+  }
+
+  return { strokeColor, className, opacity };
+};
+
 export const Canvas: React.FC = () => {
   const { nodes, edges, selectedNodeId, selectedRunId, traceSteps } = useGraphStore();
   const nodeMap = useMemo(() => {
@@ -424,18 +443,7 @@ export const Canvas: React.FC = () => {
             const trace = traceMap.get(srcNode.id);
             const status = trace ? trace.status : null;
 
-            let strokeColor = '#4b5563';
-            let className = '';
-
-            if (status === 'running') {
-              strokeColor = '#3b82f6';
-              className = 'edge-flow-running';
-            } else if (status === 'completed') {
-              strokeColor = '#10b981';
-              className = 'edge-pulse-completed';
-            } else if (status === 'failed') {
-              strokeColor = '#ef4444';
-            }
+            const { strokeColor, className, opacity } = getEdgeStyle(status);
 
             const bezierPath = getBezierPath(x1, y1, x2, y2);
 
@@ -446,7 +454,7 @@ export const Canvas: React.FC = () => {
                   fill="none"
                   stroke={strokeColor}
                   strokeWidth={5}
-                  opacity={status === 'running' ? 0.3 : 0.15}
+                  opacity={opacity}
                 />
                 <path
                   d={bezierPath}
