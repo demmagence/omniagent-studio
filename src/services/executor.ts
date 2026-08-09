@@ -171,54 +171,60 @@ class WorkflowExecutor {
       const nodeId = node.id;
       this.runningNodes.add(nodeId);
 
-      this.executeNode(nodeId).then(() => {
-        this.runningNodes.delete(nodeId);
-        this.completedNodes.add(nodeId);
+      this.executeNode(nodeId)
+        .then(() => this.handleExecutionSuccess(nodeId))
+        .catch((err) => this.handleExecutionError(nodeId, err));
+    }
+  }
 
-        const outEdges = this.outgoingEdgesMap.get(nodeId) || [];
-        for (const edge of outEdges) {
-          const target = edge.target;
-          if (this.nodeMap.has(target)) {
-            const currentDeps = this.pendingDependencies.get(target) || 0;
-            if (currentDeps > 0) {
-              this.pendingDependencies.set(target, currentDeps - 1);
-              if (currentDeps - 1 === 0) {
-                this.readyNodesQueue.push(this.nodeMap.get(target)!);
-              }
-            }
+  private handleExecutionSuccess(nodeId: string) {
+    this.runningNodes.delete(nodeId);
+    this.completedNodes.add(nodeId);
+
+    const outEdges = this.outgoingEdgesMap.get(nodeId) || [];
+    for (const edge of outEdges) {
+      const target = edge.target;
+      if (this.nodeMap.has(target)) {
+        const currentDeps = this.pendingDependencies.get(target) || 0;
+        if (currentDeps > 0) {
+          this.pendingDependencies.set(target, currentDeps - 1);
+          if (currentDeps - 1 === 0) {
+            this.readyNodesQueue.push(this.nodeMap.get(target)!);
           }
         }
+      }
+    }
 
-        this.checkAndRunNext();
-      }).catch(err => {
-        this.runningNodes.delete(nodeId);
-        if (!this.aborted) {
-          this.aborted = true;
-          this.firstError = err instanceof Error ? err : new Error(String(err));
-          this.abortController.abort();
+    this.checkAndRunNext();
+  }
 
-          const errMsg = this.firstError.message;
-          graphStore.updateTraceStep({
-            nodeId,
-            status: 'failed',
-            log: `Error executing node: ${errMsg}`,
-          });
+  private handleExecutionError(nodeId: string, err: unknown) {
+    this.runningNodes.delete(nodeId);
+    if (!this.aborted) {
+      this.aborted = true;
+      this.firstError = err instanceof Error ? err : new Error(String(err));
+      this.abortController.abort();
 
-          const finalSteps = graphStore.getState().traceSteps.map(step => {
-            if (step.nodeId !== nodeId && (step.status === 'pending' || step.status === 'running')) {
-              return {
-                ...step,
-                status: 'failed' as const,
-                log: `Aborted: ${errMsg}`
-              };
-            }
-            return step;
-          });
-          graphStore.setTraceSteps(finalSteps);
-
-          this.rejectRun(this.firstError);
-        }
+      const errMsg = this.firstError.message;
+      graphStore.updateTraceStep({
+        nodeId,
+        status: 'failed',
+        log: `Error executing node: ${errMsg}`,
       });
+
+      const finalSteps = graphStore.getState().traceSteps.map(step => {
+        if (step.nodeId !== nodeId && (step.status === 'pending' || step.status === 'running')) {
+          return {
+            ...step,
+            status: 'failed' as const,
+            log: `Aborted: ${errMsg}`
+          };
+        }
+        return step;
+      });
+      graphStore.setTraceSteps(finalSteps);
+
+      this.rejectRun(this.firstError);
     }
   }
 
