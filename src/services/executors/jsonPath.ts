@@ -1,7 +1,7 @@
 import { NodeExecutionContext, NodeExecutionResult } from './types';
 
 export const JSONPath = ({ node, incomingInput }: NodeExecutionContext): NodeExecutionResult => {
-  let parsedInput: any = incomingInput;
+  let parsedInput: unknown = incomingInput;
   if (typeof incomingInput === 'string') {
     try {
       parsedInput = JSON.parse(incomingInput);
@@ -16,7 +16,7 @@ export const JSONPath = ({ node, incomingInput }: NodeExecutionContext): NodeExe
     .replace(/\[\s*['"]?([^'"]+?)['"]?\s*\]/g, '.$1')
     .replace(/^\./, '');
 
-  let current = parsedInput;
+  let current: unknown = parsedInput;
   if (cleanPath) {
     const keys = cleanPath.split('.').filter(Boolean);
     for (const key of keys) {
@@ -35,7 +35,7 @@ export const JSONPath = ({ node, incomingInput }: NodeExecutionContext): NodeExe
           continue;
         }
       }
-      current = current[key];
+      current = typeof current === 'object' && current !== null ? (current as Record<string, unknown>)[key] : undefined;
     }
   }
 
