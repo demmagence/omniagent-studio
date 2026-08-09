@@ -1,7 +1,56 @@
 import React from 'react';
 import { graphStore, useGraphStore } from '../store/graphStore';
-import { NodeType, NodeCategory, NODE_CATEGORY_MAP, NODE_CATEGORIES } from '../types';
+import { NodeType, NodeCategory, NODE_CATEGORY_MAP, NODE_CATEGORIES, RunHistoryEntry } from '../types';
 import { serializeGraph, deserializeGraph, autoLayout } from '../utils/graphUtils';
+
+const HistoryEntryItem: React.FC<{ run: RunHistoryEntry; isSelected: boolean }> = ({ run, isSelected }) => {
+  return (
+    <div
+      data-testid={`history-entry-${run.id}`}
+      onClick={() => {
+        if (isSelected) {
+          graphStore.selectRun(null);
+        } else {
+          graphStore.selectRun(run.id);
+        }
+      }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
+        padding: '8px',
+        borderRadius: '4px',
+        backgroundColor: isSelected ? '#374151' : '#1f2937',
+        border: isSelected ? '1px solid #3b82f6' : '1px solid #4b5563',
+        cursor: 'pointer',
+        fontSize: '12px',
+        transition: 'all 0.2s'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span
+            data-testid={`run-status-dot-${run.id}`}
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: run.status === 'success' ? '#10b981' : '#ef4444',
+              display: 'inline-block'
+            }}
+          />
+          <span style={{ fontWeight: 'bold' }}>{run.status.toUpperCase()}</span>
+        </div>
+        <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+          {run.nodes.length} nodes
+        </span>
+      </div>
+      <div style={{ fontSize: '10px', color: '#9ca3af', wordBreak: 'break-all' }}>
+        {run.timestamp}
+      </div>
+    </div>
+  );
+};
 
 export const Sidebar: React.FC = () => {
   const { nodes, edges, isFallbackMode, history, selectedRunId, maxConcurrency } = useGraphStore();
@@ -342,53 +391,7 @@ export const Sidebar: React.FC = () => {
           ) : (
             history.map((run) => {
               const isSelected = selectedRunId === run.id;
-              return (
-                <div
-                  key={run.id}
-                  data-testid={`history-entry-${run.id}`}
-                  onClick={() => {
-                    if (isSelected) {
-                      graphStore.selectRun(null);
-                    } else {
-                      graphStore.selectRun(run.id);
-                    }
-                  }}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    padding: '8px',
-                    borderRadius: '4px',
-                    backgroundColor: isSelected ? '#374151' : '#1f2937',
-                    border: isSelected ? '1px solid #3b82f6' : '1px solid #4b5563',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span
-                        data-testid={`run-status-dot-${run.id}`}
-                        style={{
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          backgroundColor: run.status === 'success' ? '#10b981' : '#ef4444',
-                          display: 'inline-block'
-                        }}
-                      />
-                      <span style={{ fontWeight: 'bold' }}>{run.status.toUpperCase()}</span>
-                    </div>
-                    <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                      {run.nodes.length} nodes
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '10px', color: '#9ca3af', wordBreak: 'break-all' }}>
-                    {run.timestamp}
-                  </div>
-                </div>
-              );
+              return <HistoryEntryItem key={run.id} run={run} isSelected={isSelected} />;
             })
           )}
         </div>
