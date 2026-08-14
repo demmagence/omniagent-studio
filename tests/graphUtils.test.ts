@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { serializeGraph, autoLayout, deserializeGraph } from '../src/utils/graphUtils';
+import { serializeGraph, autoLayout, deserializeGraph, hasCycle } from '../src/utils/graphUtils';
 import { Node, Edge } from '../src/types';
 
 describe('serializeGraph', () => {
@@ -216,5 +216,55 @@ describe('deserializeGraph', () => {
   it('should throw an error if edges is not an array', () => {
     const jsonStr = JSON.stringify({ nodes: [], edges: 'not an array' });
     expect(() => deserializeGraph(jsonStr)).toThrow('Failed to deserialize graph: edges must be an array');
+  });
+});
+
+describe('hasCycle', () => {
+  it('should return false for an empty graph', () => {
+    expect(hasCycle([], [])).toBe(false);
+  });
+
+  it('should return false for a graph without edges', () => {
+    const nodes = [createNode('A'), createNode('B')];
+    expect(hasCycle(nodes, [])).toBe(false);
+  });
+
+  it('should return false for an acyclic graph (A -> B -> C)', () => {
+    const nodes = [createNode('A'), createNode('B'), createNode('C')];
+    const edges = [createEdge('A', 'B'), createEdge('B', 'C')];
+    expect(hasCycle(nodes, edges)).toBe(false);
+  });
+
+  it('should return true for a simple cycle (A -> B -> A)', () => {
+    const nodes = [createNode('A'), createNode('B')];
+    const edges = [createEdge('A', 'B'), createEdge('B', 'A')];
+    expect(hasCycle(nodes, edges)).toBe(true);
+  });
+
+  it('should return true for a complex cycle (A -> B -> C -> A)', () => {
+    const nodes = [createNode('A'), createNode('B'), createNode('C')];
+    const edges = [createEdge('A', 'B'), createEdge('B', 'C'), createEdge('C', 'A')];
+    expect(hasCycle(nodes, edges)).toBe(true);
+  });
+
+  it('should return true for a self-loop (A -> A)', () => {
+    const nodes = [createNode('A')];
+    const edges = [createEdge('A', 'A')];
+    expect(hasCycle(nodes, edges)).toBe(true);
+  });
+
+  it('should detect a cycle in a disconnected component', () => {
+    const nodes = [
+      createNode('A'), createNode('B'),
+      createNode('C'), createNode('D'), createNode('E')
+    ];
+    // A -> B is acyclic. C -> D -> E -> C is a cycle in a disconnected component.
+    const edges = [
+      createEdge('A', 'B'),
+      createEdge('C', 'D'),
+      createEdge('D', 'E'),
+      createEdge('E', 'C')
+    ];
+    expect(hasCycle(nodes, edges)).toBe(true);
   });
 });

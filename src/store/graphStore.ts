@@ -111,7 +111,7 @@ class GraphStore {
 
   addNode(type: NodeType, position = { x: 100, y: 100 }) {
     this.saveHistoryState();
-    const id = `${type}_${Math.random().toString(36).substring(2, 9)}`;
+    const id = `${type}_${crypto.randomUUID()}`;
     const newNode: Node = {
       id,
       type,
@@ -167,7 +167,7 @@ class GraphStore {
     if (exists) return null;
 
     this.saveHistoryState();
-    const id = `edge_${source}_${target}_${Math.random().toString(36).substring(2, 7)}`;
+    const id = `edge_${source}_${target}_${crypto.randomUUID()}`;
     const newEdge: Edge = { id, source, target, sourcePort, targetPort };
     this.state.edges = [...this.state.edges, newEdge];
     this.emit();
@@ -231,7 +231,7 @@ class GraphStore {
 
   addRunToHistory(run: Omit<RunHistoryEntry, 'id' | 'timestamp'>) {
     const newEntry: RunHistoryEntry = {
-      id: `run_${Math.random().toString(36).substring(2, 9)}`,
+      id: `run_${crypto.randomUUID()}`,
       timestamp: new Date().toISOString(),
       nodes: cloneNodes(run.nodes),
       edges: cloneEdges(run.edges),
