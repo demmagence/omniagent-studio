@@ -51,7 +51,7 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
           if ((parsedIp as ipaddr.IPv6).match(awsIpv6Metadata, 128)) isPrivate = true;
         }
       } catch (e) {
-        // Ignore parse errors
+        console.debug('Failed to parse IP address or match ranges', e);
       }
     }
   };
