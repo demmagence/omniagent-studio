@@ -41,6 +41,7 @@ class GraphStore {
   private listeners = new Set<Listener>();
 
   private traceStepIndex: Record<string, number> = {};
+  private historyIndex: Map<string, RunHistoryEntry> = new Map();
 
   private rebuildTraceStepIndex() {
     this.traceStepIndex = {};
@@ -238,6 +239,7 @@ class GraphStore {
       status: run.status,
     };
     this.state.history = [...this.state.history, newEntry];
+    this.historyIndex.set(newEntry.id, newEntry);
     this.emit();
   }
 
@@ -252,7 +254,7 @@ class GraphStore {
       }
       this.state.selectedRunId = null;
     } else {
-      const run = this.state.history.find((r) => r.id === runId);
+      const run = this.historyIndex.get(runId);
       if (run) {
         if (this.state.selectedRunId === null) {
           this.draft = {
@@ -273,6 +275,7 @@ class GraphStore {
 
   clearHistory() {
     this.state.history = [];
+    this.historyIndex.clear();
     if (this.state.selectedRunId !== null) {
       this.selectRun(null);
     }
@@ -297,6 +300,7 @@ class GraphStore {
     this.redoStack = [];
     this.draft = null;
     this.rebuildTraceStepIndex();
+    this.historyIndex.clear();
     this.emit();
   }
 }
