@@ -41,6 +41,7 @@ class GraphStore {
   private listeners = new Set<Listener>();
 
   private traceStepIndex: Record<string, number> = {};
+  private historyMap: Map<string, RunHistoryEntry> = new Map();
 
   private rebuildTraceStepIndex() {
     this.traceStepIndex = {};
@@ -110,7 +111,7 @@ class GraphStore {
 
   addNode(type: NodeType, position = { x: 100, y: 100 }) {
     this.saveHistoryState();
-    const id = `${type}_${Math.random().toString(36).substring(2, 9)}`;
+    const id = `${type}_${crypto.randomUUID()}`;
     const newNode: Node = {
       id,
       type,
@@ -166,7 +167,7 @@ class GraphStore {
     if (exists) return null;
 
     this.saveHistoryState();
-    const id = `edge_${source}_${target}_${Math.random().toString(36).substring(2, 7)}`;
+    const id = `edge_${source}_${target}_${crypto.randomUUID()}`;
     const newEdge: Edge = { id, source, target, sourcePort, targetPort };
     this.state.edges = [...this.state.edges, newEdge];
     this.emit();
@@ -230,7 +231,7 @@ class GraphStore {
 
   addRunToHistory(run: Omit<RunHistoryEntry, 'id' | 'timestamp'>) {
     const newEntry: RunHistoryEntry = {
-      id: `run_${Math.random().toString(36).substring(2, 9)}`,
+      id: `run_${crypto.randomUUID()}`,
       timestamp: new Date().toISOString(),
       nodes: cloneNodes(run.nodes),
       edges: cloneEdges(run.edges),
@@ -238,6 +239,7 @@ class GraphStore {
       status: run.status,
     };
     this.state.history = [...this.state.history, newEntry];
+    this.historyMap.set(newEntry.id, newEntry);
     this.emit();
   }
 
@@ -252,7 +254,7 @@ class GraphStore {
       }
       this.state.selectedRunId = null;
     } else {
-      const run = this.state.history.find((r) => r.id === runId);
+      const run = this.historyMap.get(runId);
       if (run) {
         if (this.state.selectedRunId === null) {
           this.draft = {
@@ -273,6 +275,7 @@ class GraphStore {
 
   clearHistory() {
     this.state.history = [];
+    this.historyMap.clear();
     if (this.state.selectedRunId !== null) {
       this.selectRun(null);
     }
@@ -296,6 +299,7 @@ class GraphStore {
     this.undoStack = [];
     this.redoStack = [];
     this.draft = null;
+    this.historyMap.clear();
     this.rebuildTraceStepIndex();
     this.emit();
   }
