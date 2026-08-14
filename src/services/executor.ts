@@ -3,8 +3,8 @@ import { hasCycle } from '../utils/graphUtils';
 import { Node, TraceStep, Edge } from '../types';
 
 export { getWordFrequency, calculateCosineSimilarity } from './executors/utils';
-export type { ExecutionOptions, NodeExecutionResult, NodeExecutionContext } from './executors';
-import { nodeExecutors, ExecutionOptions, NodeExecutionContext } from './executors';
+import { nodeExecutors, type ExecutionOptions, type NodeExecutionContext, type NodeExecutionResult } from './executors';
+export type { ExecutionOptions, NodeExecutionResult, NodeExecutionContext };
 
 class WorkflowExecutor {
   private nodes: Node[];
