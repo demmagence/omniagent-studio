@@ -1,6 +1,22 @@
 import { NodeExecutionContext, NodeExecutionResult } from './types';
 import { getWordFrequency, calculateCosineSimilarity } from './utils';
 
+const docFreqCache = new Map<string, Map<string, number>>();
+const CACHE_LIMIT = 5000;
+
+function getCachedWordFrequency(doc: string): Map<string, number> {
+  let freq = docFreqCache.get(doc);
+  if (!freq) {
+    freq = getWordFrequency(doc);
+    if (docFreqCache.size >= CACHE_LIMIT) {
+      const firstKey = docFreqCache.keys().next().value;
+      if (firstKey !== undefined) docFreqCache.delete(firstKey);
+    }
+    docFreqCache.set(doc, freq);
+  }
+  return freq;
+}
+
 export const VectorDB = ({ node, incomingInput }: NodeExecutionContext): NodeExecutionResult => {
   const queryStr = typeof incomingInput === 'string'
     ? incomingInput
@@ -23,7 +39,7 @@ export const VectorDB = ({ node, incomingInput }: NodeExecutionContext): NodeExe
   const queryFreq = getWordFrequency(queryStr);
   const matches = docs
     .reduce((acc: { doc: string; similarity: number }[], doc: string) => {
-      const docFreq = getWordFrequency(doc);
+      const docFreq = getCachedWordFrequency(doc);
       const similarity = calculateCosineSimilarity(queryFreq, docFreq);
       if (similarity >= threshold) {
         acc.push({ doc, similarity });
