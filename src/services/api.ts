@@ -2,11 +2,80 @@ import ipaddr from 'ipaddr.js';
 
 const dnsCache = new Map<string, { type: number; data: string }[]>();
 
-async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; isLocal: boolean }> {
-  let isPrivate = false;
-  let isLocal = false;
+function checkIpStatus(ipStr: string, state: { isPrivate: boolean; isLocal: boolean }) {
+  if (ipaddr.isValid(ipStr)) {
+    try {
+      let parsedIp = ipaddr.parse(ipStr);
 
-  if (hostname === 'localhost') isLocal = true;
+      // If IPv4 mapped IPv6, unmap it to test the actual IPv4 address
+      if (parsedIp.kind() === 'ipv6') {
+        const ip6 = parsedIp as ipaddr.IPv6;
+        if (ip6.isIPv4MappedAddress()) {
+          parsedIp = ip6.toIPv4Address();
+        }
+      }
+
+      const range = parsedIp.range();
+
+      if (range === 'loopback' || range === 'unspecified') {
+        state.isLocal = true;
+      } else if (
+        range === 'private' ||
+        range === 'uniqueLocal' ||
+        range === 'linkLocal'
+      ) {
+        state.isPrivate = true;
+      }
+
+      // Check for specific AWS IPv6 metadata address or similar ranges
+      if (parsedIp.kind() === 'ipv6') {
+        const awsIpv6Metadata = ipaddr.parse('fd00:ec2::254') as ipaddr.IPv6;
+        if ((parsedIp as ipaddr.IPv6).match(awsIpv6Metadata, 128)) state.isPrivate = true;
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  }
+}
+
+async function resolveDohRecords(hostname: string, checkIp: (ipStr: string) => void) {
+  const resolveType = async (type: string) => {
+    const processRecords = (records: any[]) => {
+      for (const record of records) {
+        if (record.type === 1 || record.type === 28) {
+          checkIp(record.data);
+        }
+      }
+    };
+
+    const cacheKey = `${hostname}_${type}`;
+    if (dnsCache.has(cacheKey)) {
+      const cachedAnswer = dnsCache.get(cacheKey)!;
+      processRecords(cachedAnswer);
+      return;
+    }
+
+    const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=${type}`, {
+      headers: { accept: 'application/dns-json' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const answer = data.Answer || [];
+      dnsCache.set(cacheKey, answer);
+      if (answer) {
+        processRecords(answer);
+      }
+    }
+  };
+
+  // Check both A and AAAA records
+  await Promise.all([resolveType('A'), resolveType('AAAA')]);
+}
+
+async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; isLocal: boolean }> {
+  const state = { isPrivate: false, isLocal: false };
+
+  if (hostname === 'localhost') state.isLocal = true;
 
   // Strip brackets for IPv6 parsing
   let ipToParse = hostname;
@@ -20,84 +89,20 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
     return { isPrivate: false, isLocal: false };
   }
 
-  const checkIp = (ipStr: string) => {
-    if (ipaddr.isValid(ipStr)) {
-      try {
-        let parsedIp = ipaddr.parse(ipStr);
-
-        // If IPv4 mapped IPv6, unmap it to test the actual IPv4 address
-        if (parsedIp.kind() === 'ipv6') {
-          const ip6 = parsedIp as ipaddr.IPv6;
-          if (ip6.isIPv4MappedAddress()) {
-            parsedIp = ip6.toIPv4Address();
-          }
-        }
-
-        const range = parsedIp.range();
-
-        if (range === 'loopback' || range === 'unspecified') {
-          isLocal = true;
-        } else if (
-          range === 'private' ||
-          range === 'uniqueLocal' ||
-          range === 'linkLocal'
-        ) {
-          isPrivate = true;
-        }
-
-        // Check for specific AWS IPv6 metadata address or similar ranges
-        if (parsedIp.kind() === 'ipv6') {
-          const awsIpv6Metadata = ipaddr.parse('fd00:ec2::254') as ipaddr.IPv6;
-          if ((parsedIp as ipaddr.IPv6).match(awsIpv6Metadata, 128)) isPrivate = true;
-        }
-      } catch (e) {
-        // Ignore parse errors
-      }
-    }
-  };
+  const checkIp = (ipStr: string) => checkIpStatus(ipStr, state);
 
   if (ipaddr.isValid(ipToParse)) {
     checkIp(ipToParse);
   } else if (hostname !== 'localhost') {
     // If it's a hostname, perform DNS resolution via DoH to check underlying IPs
     try {
-      const resolveType = async (type: string) => {
-        const processRecords = (records: any[]) => {
-          for (const record of records) {
-            if (record.type === 1 || record.type === 28) {
-              checkIp(record.data);
-            }
-          }
-        };
-
-        const cacheKey = `${hostname}_${type}`;
-        if (dnsCache.has(cacheKey)) {
-          const cachedAnswer = dnsCache.get(cacheKey)!;
-          processRecords(cachedAnswer);
-          return;
-        }
-
-        const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=${type}`, {
-          headers: { accept: 'application/dns-json' },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const answer = data.Answer || [];
-          dnsCache.set(cacheKey, answer);
-          if (answer) {
-            processRecords(answer);
-          }
-        }
-      };
-
-      // Check both A and AAAA records
-      await Promise.all([resolveType('A'), resolveType('AAAA')]);
+      await resolveDohRecords(hostname, checkIp);
     } catch (e) {
       console.warn('DNS over HTTPS resolution failed', e);
     }
   }
 
-  return { isPrivate, isLocal };
+  return state;
 }
 
 export interface LLMResponse {
