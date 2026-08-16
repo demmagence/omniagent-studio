@@ -2,8 +2,8 @@ import React from 'react';
 import { useGraphStore, graphStore } from '../store/graphStore';
 
 export const ConfigPanel: React.FC = () => {
-  const { nodes, selectedNodeId } = useGraphStore();
-  const selectedNode = nodes.find(n => n.id === selectedNodeId);
+  const { nodeMap = {}, selectedNodeId } = useGraphStore();
+  const selectedNode = selectedNodeId ? nodeMap[selectedNodeId] : null;
 
   if (!selectedNode) {
     return (

@@ -24,14 +24,7 @@ const getEdgeStyle = (status: string | null) => {
 };
 
 export const Canvas: React.FC = () => {
-  const { nodes, edges, selectedNodeId, selectedRunId, traceSteps } = useGraphStore();
-  const nodeMap = useMemo(() => {
-    const map = new Map<string, typeof nodes[0]>();
-    for (const node of nodes) {
-      map.set(node.id, node);
-    }
-    return map;
-  }, [nodes]);
+  const { nodes, edges, selectedNodeId, selectedRunId, traceSteps, nodeMap = {} } = useGraphStore();
   const traceMap = useMemo(() => traceSteps.reduce((map, t) => map.set(t.nodeId, t), new Map()), [traceSteps]);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -179,7 +172,7 @@ export const Canvas: React.FC = () => {
 
     const initialMouseX = e.clientX;
     const initialMouseY = e.clientY;
-    const targetNode = nodeMap.get(nodeId);
+    const targetNode = nodeMap[nodeId];
     if (!targetNode) return;
     const initialNodeX = targetNode.position.x;
     const initialNodeY = targetNode.position.y;
@@ -348,7 +341,7 @@ export const Canvas: React.FC = () => {
   const renderActiveConnection = () => {
     if (!activeConnection) return null;
 
-    const srcNode = nodeMap.get(activeConnection.nodeId);
+    const srcNode = nodeMap[activeConnection.nodeId];
     if (!srcNode) return null;
 
     let x1, y1, x2, y2;
@@ -431,8 +424,8 @@ export const Canvas: React.FC = () => {
           }}
         >
           {edges.map((edge) => {
-            const srcNode = nodeMap.get(edge.source);
-            const tgtNode = nodeMap.get(edge.target);
+            const srcNode = nodeMap[edge.source];
+            const tgtNode = nodeMap[edge.target];
             if (!srcNode || !tgtNode) return null;
 
             const x1 = srcNode.position.x + 200;

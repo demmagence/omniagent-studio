@@ -3,7 +3,7 @@ import { useGraphStore } from '../store/graphStore';
 import { executeWorkflow } from '../services/executor';
 
 export const TracingConsole: React.FC = () => {
-  const { traceSteps, isRunning, nodes, selectedRunId } = useGraphStore();
+  const { traceSteps, isRunning, nodes, selectedRunId, nodeMap = {} } = useGraphStore();
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [elapsedTime, setElapsedTime] = React.useState<number>(0);
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
@@ -52,12 +52,6 @@ export const TracingConsole: React.FC = () => {
     },
     { totalTokens: 0, completedCount: 0, failedCount: 0, pendingCount: 0, runningCount: 0 }
   );
-
-  const nodeMap = React.useMemo(() => {
-    const map = new Map();
-    nodes.forEach(n => map.set(n.id, n));
-    return map;
-  }, [nodes]);
 
   return (
     <div
@@ -150,7 +144,7 @@ export const TracingConsole: React.FC = () => {
           <p style={{ color: '#6b7280', fontSize: '13px', margin: 0 }}>No trace steps. Hit "Run Workflow" to execute.</p>
         ) : (
           traceSteps.map((step, index) => {
-            const node = nodeMap.get(step.nodeId);
+            const node = nodeMap[step.nodeId];
             const label = node?.data.label || step.nodeId;
             const statusColors = {
               pending: '#9ca3af',

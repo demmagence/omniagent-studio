@@ -5,6 +5,7 @@ import { cloneNodes, cloneEdges, cloneTraceSteps } from './graphStoreHelpers';
 export interface GraphStoreState {
   nodes: Node[];
   edges: Edge[];
+  nodeMap: Record<string, Node>;
   selectedNodeId: string | null;
   traceSteps: TraceStep[];
   isRunning: boolean;
@@ -22,6 +23,7 @@ class GraphStore {
   private state: GraphStoreState = {
     nodes: [],
     edges: [],
+    nodeMap: {},
     selectedNodeId: null,
     traceSteps: [],
     isRunning: false,
@@ -48,6 +50,15 @@ class GraphStore {
     for (let i = 0; i < this.state.traceSteps.length; i++) {
       this.traceStepIndex[this.state.traceSteps[i].nodeId] = i;
     }
+  }
+
+  private setNodes(nodes: Node[]) {
+    this.state.nodes = nodes;
+    const map: Record<string, Node> = {};
+    for (let i = 0; i < nodes.length; i++) {
+      map[nodes[i].id] = nodes[i];
+    }
+    this.state.nodeMap = map;
   }
 
   getState(): GraphStoreState {
@@ -85,9 +96,9 @@ class GraphStore {
     const previous = this.undoStack.pop();
     if (previous) {
       this.redoStack.push(this.cloneGraphState());
-      this.state.nodes = previous.nodes;
+      this.setNodes(previous.nodes);
       this.state.edges = previous.edges;
-      if (this.state.selectedNodeId && !this.state.nodes.some((n) => n.id === this.state.selectedNodeId)) {
+      if (this.state.selectedNodeId && !this.state.nodeMap[this.state.selectedNodeId]) {
         this.state.selectedNodeId = null;
       }
       this.state.canUndo = this.undoStack.length > 0;
@@ -101,7 +112,7 @@ class GraphStore {
     const next = this.redoStack.pop();
     if (next) {
       this.undoStack.push(this.cloneGraphState());
-      this.state.nodes = next.nodes;
+      this.setNodes(next.nodes);
       this.state.edges = next.edges;
       this.state.canUndo = this.undoStack.length > 0;
       this.state.canRedo = this.redoStack.length > 0;
@@ -121,14 +132,14 @@ class GraphStore {
         type,
       },
     };
-    this.state.nodes = [...this.state.nodes, newNode];
+    this.setNodes([...this.state.nodes, newNode]);
     this.emit();
     return newNode;
   }
 
   removeNode(nodeId: string) {
     this.saveHistoryState();
-    this.state.nodes = this.state.nodes.filter((n) => n.id !== nodeId);
+    this.setNodes(this.state.nodes.filter((n) => n.id !== nodeId));
     this.state.edges = this.state.edges.filter((e) => e.source !== nodeId && e.target !== nodeId);
     if (this.state.selectedNodeId === nodeId) {
       this.state.selectedNodeId = null;
@@ -137,22 +148,22 @@ class GraphStore {
   }
 
   updateNodeData(nodeId: string, data: Partial<NodeData>) {
-    this.state.nodes = this.state.nodes.map((n) => {
+    this.setNodes(this.state.nodes.map((n) => {
       if (n.id === nodeId) {
         return { ...n, data: { ...n.data, ...data } };
       }
       return n;
-    });
+    }));
     this.emit();
   }
 
   updateNodePosition(nodeId: string, position: { x: number; y: number }) {
-    this.state.nodes = this.state.nodes.map((n) => {
+    this.setNodes(this.state.nodes.map((n) => {
       if (n.id === nodeId) {
         return { ...n, position };
       }
       return n;
-    });
+    }));
     this.emit();
   }
 
@@ -182,7 +193,7 @@ class GraphStore {
 
   setGraph(nodes: Node[], edges: Edge[]) {
     this.saveHistoryState();
-    this.state.nodes = [...nodes];
+    this.setNodes([...nodes]);
     this.state.edges = [...edges];
     this.emit();
   }
@@ -246,7 +257,7 @@ class GraphStore {
   selectRun(runId: string | null) {
     if (runId === null) {
       if (this.draft) {
-        this.state.nodes = [...this.draft.nodes];
+        this.setNodes([...this.draft.nodes]);
         this.state.edges = [...this.draft.edges];
         this.state.traceSteps = [...this.draft.traceSteps];
         this.rebuildTraceStepIndex();
@@ -263,7 +274,7 @@ class GraphStore {
             traceSteps: [...this.state.traceSteps],
           };
         }
-        this.state.nodes = [...run.nodes];
+        this.setNodes([...run.nodes]);
         this.state.edges = [...run.edges];
         this.state.traceSteps = [...run.traceSteps];
         this.rebuildTraceStepIndex();
@@ -286,6 +297,7 @@ class GraphStore {
     this.state = {
       nodes: [],
       edges: [],
+      nodeMap: {},
       selectedNodeId: null,
       traceSteps: [],
       isRunning: false,

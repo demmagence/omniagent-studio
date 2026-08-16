@@ -44,7 +44,7 @@ describe('TracingConsole', () => {
     vi.mocked(useGraphStore).mockReturnValue({
       traceSteps: [],
       isRunning: false,
-      nodes: [{ id: 'node-1' }],
+      nodes: [{ id: 'node-1', data: { label: 'Node 1' } }], nodeMap: { 'node-1': { id: 'node-1', data: { label: 'Node 1' } } },
       selectedRunId: null,
     } as any);
 
@@ -57,7 +57,7 @@ describe('TracingConsole', () => {
     vi.mocked(useGraphStore).mockReturnValue({
       traceSteps: [],
       isRunning: true,
-      nodes: [{ id: 'node-1' }],
+      nodes: [{ id: 'node-1', data: { label: 'Node 1' } }], nodeMap: { 'node-1': { id: 'node-1', data: { label: 'Node 1' } } },
       selectedRunId: null,
     } as any);
 
@@ -80,6 +80,10 @@ describe('TracingConsole', () => {
         { id: 'node-1', data: { label: 'Node 1' } },
         { id: 'node-2', data: { label: 'Node 2' } },
       ],
+      nodeMap: {
+        'node-1': { id: 'node-1', data: { label: 'Node 1' } },
+        'node-2': { id: 'node-2', data: { label: 'Node 2' } },
+      },
       selectedRunId: null,
     } as any);
 
@@ -113,7 +117,7 @@ describe('TracingConsole', () => {
     vi.mocked(useGraphStore).mockReturnValue({
       traceSteps: [],
       isRunning: false,
-      nodes: [{ id: 'node-1' }],
+      nodes: [{ id: 'node-1', data: { label: 'Node 1' } }], nodeMap: { 'node-1': { id: 'node-1', data: { label: 'Node 1' } } },
       selectedRunId: null,
     } as any);
 
@@ -139,7 +143,7 @@ describe('TracingConsole', () => {
     vi.mocked(useGraphStore).mockReturnValue({
       traceSteps: [{ nodeId: 'n1', status: 'running' }],
       isRunning: true,
-      nodes: [{ id: 'node-1' }],
+      nodes: [{ id: 'node-1', data: { label: 'Node 1' } }], nodeMap: { 'node-1': { id: 'node-1', data: { label: 'Node 1' } } },
       selectedRunId: null,
     } as any);
 
@@ -156,7 +160,7 @@ describe('TracingConsole', () => {
     const storeObj = {
       traceSteps: [{ nodeId: 'n1', status: 'completed' }],
       isRunning: false,
-      nodes: [{ id: 'node-1' }],
+      nodes: [{ id: 'node-1', data: { label: 'Node 1' } }], nodeMap: { 'node-1': { id: 'node-1', data: { label: 'Node 1' } } },
       selectedRunId: null,
     };
 

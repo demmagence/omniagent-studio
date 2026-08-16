@@ -4,7 +4,7 @@ import { Node, Edge } from '../types';
 
 interface ConnectionsPanelProps {
   edges: Edge[];
-  nodeMap: Map<string, Node>;
+  nodeMap: Record<string, Node>;
 }
 
 export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({ edges, nodeMap }) => {
@@ -37,8 +37,8 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({ edges, nodeM
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
           {edges.map((edge) => {
-            const srcNode = nodeMap.get(edge.source);
-            const tgtNode = nodeMap.get(edge.target);
+            const srcNode = nodeMap[edge.source];
+            const tgtNode = nodeMap[edge.target];
             const srcLabel = srcNode?.data.label || edge.source;
             const tgtLabel = tgtNode?.data.label || edge.target;
             return (
