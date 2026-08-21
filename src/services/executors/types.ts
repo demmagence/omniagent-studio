@@ -8,15 +8,15 @@ export interface ExecutionOptions {
 }
 
 export interface NodeExecutionResult {
-  nodeOutput: any;
+  nodeOutput: unknown;
   log: string;
   tokensUsed: number;
-  nodeInput?: any;
+  nodeInput?: unknown;
 }
 
 export interface NodeExecutionContext {
   node: Node;
-  incomingInput: any;
+  incomingInput: unknown;
   fallback: boolean;
   abortController: AbortController;
   graphStore: typeof graphStore;
