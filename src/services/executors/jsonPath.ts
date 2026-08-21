@@ -24,10 +24,6 @@ export const JSONPath = ({ node, incomingInput }: NodeExecutionContext): NodeExe
         current = undefined;
         break;
       }
-      if (['__proto__', 'constructor', 'prototype'].includes(key)) {
-        current = undefined;
-        break;
-      }
       if (Array.isArray(current)) {
         const idx = parseInt(key, 10);
         if (!isNaN(idx)) {
@@ -35,7 +31,12 @@ export const JSONPath = ({ node, incomingInput }: NodeExecutionContext): NodeExe
           continue;
         }
       }
-      current = typeof current === 'object' && current !== null ? (current as Record<string, unknown>)[key] : undefined;
+      if (typeof current === 'object' && current !== null && Object.prototype.hasOwnProperty.call(current, key)) {
+        current = (current as Record<string, unknown>)[key];
+      } else {
+        current = undefined;
+        break;
+      }
     }
   }
 
