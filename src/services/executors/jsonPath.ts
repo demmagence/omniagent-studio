@@ -1,5 +1,9 @@
 import { NodeExecutionContext, NodeExecutionResult } from './types';
 
+const DOLLAR_SIGN_REGEX = /^\$/;
+const BRACKET_NOTATION_REGEX = /\[\s*['"]?([^'"]+?)['"]?\s*\]/g;
+const LEADING_DOT_REGEX = /^\./;
+
 export const JSONPath = ({ node, incomingInput }: NodeExecutionContext): NodeExecutionResult => {
   let parsedInput: unknown = incomingInput;
   if (typeof incomingInput === 'string') {
@@ -11,10 +15,10 @@ export const JSONPath = ({ node, incomingInput }: NodeExecutionContext): NodeExe
   }
 
   const rawPath = node.data.jsonPath || '';
-  const path = rawPath.replace(/^\$/, '');
+  const path = rawPath.replace(DOLLAR_SIGN_REGEX, '');
   const cleanPath = path
-    .replace(/\[\s*['"]?([^'"]+?)['"]?\s*\]/g, '.$1')
-    .replace(/^\./, '');
+    .replace(BRACKET_NOTATION_REGEX, '.$1')
+    .replace(LEADING_DOT_REGEX, '');
 
   let current: unknown = parsedInput;
   if (cleanPath) {
