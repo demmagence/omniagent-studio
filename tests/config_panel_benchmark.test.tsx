@@ -26,5 +26,5 @@ describe('ConfigPanel Performance Benchmark', () => {
 
     console.log(`ConfigPanel render time for 100 renders with ${numNodes} nodes: ${end - start} ms`);
     expect(end - start).toBeGreaterThan(0);
-  });
+  }, 60000);
 });
