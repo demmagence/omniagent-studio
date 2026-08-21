@@ -217,6 +217,11 @@ describe('deserializeGraph', () => {
     const jsonStr = JSON.stringify({ nodes: [], edges: 'not an array' });
     expect(() => deserializeGraph(jsonStr)).toThrow('Failed to deserialize graph: edges must be an array');
   });
+
+  it('should throw an error for invalid JSON format', () => {
+    const invalidJsonStr = '{ invalid json }';
+    expect(() => deserializeGraph(invalidJsonStr)).toThrow(/Failed to deserialize graph:/);
+  });
 });
 
 describe('hasCycle', () => {
