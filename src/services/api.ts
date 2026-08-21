@@ -40,7 +40,7 @@ function checkIpStatus(ipStr: string, state: { isPrivate: boolean; isLocal: bool
 
 async function resolveDohRecords(hostname: string, checkIp: (ipStr: string) => void) {
   const resolveType = async (type: string) => {
-    const processRecords = (records: any[]) => {
+    const processRecords = (records: { type: number; data: string }[]) => {
       for (const record of records) {
         if (record.type === 1 || record.type === 28) {
           checkIp(record.data);

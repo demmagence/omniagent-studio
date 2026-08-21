@@ -1,5 +1,4 @@
 import { graphStore } from '../store/graphStore';
-import { hasCycle } from '../utils/graphUtils';
 import { Node, TraceStep, Edge } from '../types';
 
 export { getWordFrequency, calculateCosineSimilarity } from './executors/utils';
@@ -76,6 +75,33 @@ class WorkflowExecutor {
     this.aborted = false;
     this.firstError = null;
     this.abortController = new AbortController();
+  }
+
+  private hasCycle(): boolean {
+    const queue: string[] = [];
+    const inDegree = new Map(this.pendingDependencies);
+    let count = 0;
+
+    for (const [nodeId, degree] of inDegree.entries()) {
+      if (degree === 0) queue.push(nodeId);
+    }
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      count++;
+
+      const edges = this.outgoingEdgesMap.get(current) || [];
+      for (const edge of edges) {
+        const target = edge.target;
+        const currentDegree = inDegree.get(target)! - 1;
+        inDegree.set(target, currentDegree);
+        if (currentDegree === 0) {
+          queue.push(target);
+        }
+      }
+    }
+
+    return count !== this.nodes.length;
   }
 
   private getIncomingInputs(targetId: string) {
@@ -247,7 +273,7 @@ class WorkflowExecutor {
     }));
     graphStore.setTraceSteps(initialSteps);
 
-    if (hasCycle(this.nodes, this.edges)) {
+    if (this.hasCycle()) {
       const errorMsg = 'Workflow contains circular dependencies / cycles.';
       const failedSteps = initialSteps.map(step => ({
         ...step,
