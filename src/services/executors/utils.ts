@@ -1,5 +1,7 @@
+const WORD_REGEX = /\b\w+\b/g;
+
 export function getWordFrequency(text: string): Map<string, number> {
-  const words = text.toLowerCase().match(/\b\w+\b/g) || [];
+  const words = text.toLowerCase().match(WORD_REGEX) || [];
   const freq = new Map<string, number>();
   for (const w of words) {
     freq.set(w, (freq.get(w) || 0) + 1);
