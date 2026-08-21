@@ -94,7 +94,7 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
   if (ipaddr.isValid(ipToParse)) {
     checkIp(ipToParse);
   } else if (hostname !== 'localhost') {
-    // If it's a hostname, perform DNS resolution via DoH to check underlying IPs
+    // If it's a hostname, perform DNS resolution via DoH to check all underlying IPs
     try {
       await resolveDohRecords(hostname, checkIp);
     } catch (e) {
