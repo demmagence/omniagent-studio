@@ -1,6 +1,5 @@
-import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import App from '../src/App';
 import { graphStore } from '../src/store/graphStore';
 

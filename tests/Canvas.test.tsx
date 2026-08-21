@@ -82,7 +82,7 @@ describe('Canvas Component', () => {
       { id: 'n2', type: 'Prompt', position: { x: 200, y: 0 }, data: { label: 'Node 2', type: 'Prompt' } }
     ], []);
 
-    const { container } = render(<Canvas />);
+    render(<Canvas />);
 
     const outPort = screen.getByTestId('port-out-n1');
 
