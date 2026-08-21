@@ -353,6 +353,11 @@ describe('executor utility functions', () => {
       expect(similarity).toBeCloseTo(0.5, 5);
     });
 
+    it('should return 0 for maps with explicit zero frequencies (zero norm)', () => {
+      const zeroFreq = new Map([['hello', 0]]);
+      expect(calculateCosineSimilarity(zeroFreq, zeroFreq)).toBe(0);
+    });
+
     it('should return 0 when one or both documents are empty', () => {
       const emptyFreq = new Map<string, number>();
       const freq = getWordFrequency('hello world');
