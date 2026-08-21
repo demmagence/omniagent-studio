@@ -1,6 +1,7 @@
 import ipaddr from 'ipaddr.js';
 
 const dnsCache = new Map<string, { type: number; data: string }[]>();
+const networkTypeCache = new Map<string, { isPrivate: boolean; isLocal: boolean }>();
 
 function checkIpStatus(ipStr: string, state: { isPrivate: boolean; isLocal: boolean }) {
   if (ipaddr.isValid(ipStr)) {
@@ -73,6 +74,10 @@ async function resolveDohRecords(hostname: string, checkIp: (ipStr: string) => v
 }
 
 async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; isLocal: boolean }> {
+  if (networkTypeCache.has(hostname)) {
+    return { ...networkTypeCache.get(hostname)! };
+  }
+
   const state = { isPrivate: false, isLocal: false };
 
   if (hostname === 'localhost') state.isLocal = true;
@@ -86,7 +91,8 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
   // Skip DoH resolution in tests to prevent hanging/failing tests unless specifically testing validation
   const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
   if (proc && proc.env && proc.env.NODE_ENV === 'test' && !proc.env.TEST_VALIDATE_ENDPOINT) {
-    return { isPrivate: false, isLocal: false };
+    networkTypeCache.set(hostname, state);
+    return { ...state };
   }
 
   const checkIp = (ipStr: string) => checkIpStatus(ipStr, state);
@@ -102,7 +108,8 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
     }
   }
 
-  return state;
+  networkTypeCache.set(hostname, state);
+  return { ...state };
 }
 
 export interface LLMResponse {
