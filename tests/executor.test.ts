@@ -183,6 +183,20 @@ describe('executor utility functions', () => {
   });
 
   describe('JSONPath', () => {
+    it('should return error if incomingInput is invalid JSON', () => {
+      const nodeContext = {
+        node: { data: { jsonPath: 'a.b' } },
+        incomingInput: '{ invalid json }'
+      };
+      const result = JSONPath(nodeContext as any as NodeExecutionContext);
+      expect(result).toEqual({
+        nodeOutput: null,
+        error: 'Invalid JSON input',
+        log: 'Invalid JSON input',
+        tokensUsed: 0
+      });
+    });
+
     it('should block access to __proto__', () => {
       const nodeContext = {
         node: { data: { jsonPath: '__proto__' } },

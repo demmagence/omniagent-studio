@@ -6,7 +6,7 @@ export const JSONPath = ({ node, incomingInput }: NodeExecutionContext): NodeExe
     try {
       parsedInput = JSON.parse(incomingInput);
     } catch (e) {
-      // Keep as is
+      return { nodeOutput: null, error: 'Invalid JSON input', log: 'Invalid JSON input', tokensUsed: 0 };
     }
   }
 

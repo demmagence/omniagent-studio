@@ -339,7 +339,7 @@ describe('Tier 2: Boundary & Edge Cases', () => {
     expect(jsonPathStep).toBeDefined();
     expect(jsonPathStep?.status).toBe('completed');
     expect(jsonPathStep?.input).toBe('{"invalid": "json"');
-    expect(jsonPathStep?.output).toBe('{"invalid": "json"');
+    expect(jsonPathStep?.output).toBe(null);
   });
 
 });
