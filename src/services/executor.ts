@@ -24,7 +24,7 @@ class WorkflowExecutor {
   private firstError: Error | null;
   private abortController: AbortController;
   private resolveRun!: (value: TraceStep[]) => void;
-  private rejectRun!: (reason?: any) => void;
+  private rejectRun!: (reason?: unknown) => void;
 
   constructor(options: ExecutionOptions) {
     const { nodes, edges, isFallbackMode, maxConcurrency: storeMaxConcurrency } = graphStore.getState();
