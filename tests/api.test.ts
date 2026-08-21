@@ -58,6 +58,7 @@ describe('validateEndpointUrl', () => {
   it('should reject URLs containing credentials', async () => {
     await expect(validateEndpointUrl('http://user:pass@localhost:11434')).rejects.toThrow('Endpoint URL must not contain credentials.');
     await expect(validateEndpointUrl('https://admin@api.example.com')).rejects.toThrow('Endpoint URL must not contain credentials.');
+    await expect(validateEndpointUrl('http://user:pass@example.com')).rejects.toThrow('Endpoint URL must not contain credentials.');
   });
 
   it('should reject forbidden private network addresses', async () => {

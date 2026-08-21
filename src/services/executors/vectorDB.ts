@@ -4,6 +4,9 @@ import { getWordFrequency, calculateCosineSimilarity } from './utils';
 const docFreqCache = new Map<string, Map<string, number>>();
 const CACHE_LIMIT = 5000;
 
+const parsedDocsCache = new Map<string, string[]>();
+const PARSED_CACHE_LIMIT = 100;
+
 function getCachedWordFrequency(doc: string): Map<string, number> {
   let freq = docFreqCache.get(doc);
   if (!freq) {
@@ -25,10 +28,21 @@ export const VectorDB = ({ node, incomingInput }: NodeExecutionContext): NodeExe
       : '';
 
   const model = node.data.embeddingModel || 'default';
-  const docs = (node.data.documents || '')
-    .split('\n')
-    .map((d: string) => d.trim())
-    .filter(Boolean);
+
+  const rawDocs = node.data.documents || '';
+  let docs = parsedDocsCache.get(rawDocs);
+  if (!docs) {
+    docs = rawDocs
+      .split('\n')
+      .map((d: string) => d.trim())
+      .filter(Boolean);
+
+    if (parsedDocsCache.size >= PARSED_CACHE_LIMIT) {
+      const firstKey = parsedDocsCache.keys().next().value;
+      if (firstKey !== undefined) parsedDocsCache.delete(firstKey);
+    }
+    parsedDocsCache.set(rawDocs, docs);
+  }
 
   const threshold = node.data.similarityThreshold !== undefined
     ? node.data.similarityThreshold
