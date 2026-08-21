@@ -24,6 +24,15 @@ export const VectorDB = ({ node, incomingInput }: NodeExecutionContext): NodeExe
       ? JSON.stringify(incomingInput)
       : '';
 
+  if (!queryStr) {
+    return {
+      nodeOutput: null,
+      error: 'Query is required for VectorDB',
+      log: 'Error: Query is required for VectorDB',
+      tokensUsed: 0
+    };
+  }
+
   const model = node.data.embeddingModel || 'default';
   const docs = (node.data.documents || '')
     .split('\n')

@@ -113,14 +113,30 @@ describe('executor utility functions', () => {
       expect(result.nodeOutput).toEqual([]);
     });
 
-    it('should handle null/undefined incomingInput', () => {
+    it('should return error when query is empty or null', () => {
       const nodeContext = {
         node: { data: { documents: 'apple\norange' } },
         incomingInput: null
       };
       const result = VectorDB(nodeContext as any as NodeExecutionContext);
-      expect(result.nodeOutput).toEqual(['apple', 'orange']);
-      expect(result.nodeInput).toBe('');
+      expect(result).toEqual({
+        nodeOutput: null,
+        error: 'Query is required for VectorDB',
+        log: 'Error: Query is required for VectorDB',
+        tokensUsed: 0
+      });
+
+      const nodeContextEmptyStr = {
+        node: { data: { documents: 'apple\norange' } },
+        incomingInput: ''
+      };
+      const resultEmptyStr = VectorDB(nodeContextEmptyStr as any as NodeExecutionContext);
+      expect(resultEmptyStr).toEqual({
+        nodeOutput: null,
+        error: 'Query is required for VectorDB',
+        log: 'Error: Query is required for VectorDB',
+        tokensUsed: 0
+      });
     });
   });
 

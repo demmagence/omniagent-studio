@@ -12,6 +12,7 @@ export interface NodeExecutionResult {
   log: string;
   tokensUsed: number;
   nodeInput?: any;
+  error?: string;
 }
 
 export interface NodeExecutionContext {
