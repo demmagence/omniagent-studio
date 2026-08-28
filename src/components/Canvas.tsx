@@ -24,8 +24,7 @@ const getEdgeStyle = (status: string | null) => {
 };
 
 export const Canvas: React.FC = () => {
-  const { nodes, edges, selectedNodeId, selectedRunId, traceSteps, nodeMap = {} } = useGraphStore();
-  const traceMap = useMemo(() => traceSteps.reduce((map, t) => map.set(t.nodeId, t), new Map()), [traceSteps]);
+  const { nodes, edges, selectedNodeId, selectedRunId, traceMap = {}, nodeMap = {} } = useGraphStore();
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [activeConnection, setActiveConnection] = useState<{
@@ -433,7 +432,7 @@ export const Canvas: React.FC = () => {
             const x2 = tgtNode.position.x;
             const y2 = tgtNode.position.y + 60;
 
-            const trace = traceMap.get(srcNode.id);
+            const trace = traceMap[srcNode.id];
             const status = trace ? trace.status : null;
 
             const { strokeColor, className, opacity } = getEdgeStyle(status);
@@ -470,7 +469,7 @@ export const Canvas: React.FC = () => {
             node={node}
             isSelected={node.id === selectedNodeId}
             allNodes={nodes}
-            nodeStatus={traceMap.get(node.id)?.status}
+            nodeStatus={traceMap[node.id]?.status}
             onStartDrag={startDragNode}
             onPortMouseDown={startConnect}
           />

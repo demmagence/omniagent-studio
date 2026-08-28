@@ -8,6 +8,7 @@ export interface GraphStoreState {
   nodeMap: Record<string, Node>;
   selectedNodeId: string | null;
   traceSteps: TraceStep[];
+  traceMap: Record<string, TraceStep>;
   isRunning: boolean;
   isFallbackMode: boolean;
   history: RunHistoryEntry[];
@@ -26,6 +27,7 @@ class GraphStore {
     nodeMap: {},
     selectedNodeId: null,
     traceSteps: [],
+    traceMap: {},
     isRunning: false,
     isFallbackMode: true,
     history: [],
@@ -47,9 +49,13 @@ class GraphStore {
 
   private rebuildTraceStepIndex() {
     this.traceStepIndex = {};
+    const map: Record<string, TraceStep> = {};
     for (let i = 0; i < this.state.traceSteps.length; i++) {
-      this.traceStepIndex[this.state.traceSteps[i].nodeId] = i;
+      const step = this.state.traceSteps[i];
+      this.traceStepIndex[step.nodeId] = i;
+      map[step.nodeId] = step;
     }
+    this.state.traceMap = map;
   }
 
   private setNodes(nodes: Node[]) {
@@ -207,9 +213,11 @@ class GraphStore {
   updateTraceStep(step: Partial<TraceStep> & { nodeId: string }) {
     const existingIndex = this.traceStepIndex[step.nodeId];
     if (existingIndex !== undefined) {
+      const updatedStep = { ...this.state.traceSteps[existingIndex], ...step };
       const newTraceSteps = [...this.state.traceSteps];
-      newTraceSteps[existingIndex] = { ...newTraceSteps[existingIndex], ...step };
+      newTraceSteps[existingIndex] = updatedStep;
       this.state.traceSteps = newTraceSteps;
+      this.state.traceMap = { ...this.state.traceMap, [step.nodeId]: updatedStep };
     } else {
       const newStep: TraceStep = {
         nodeId: step.nodeId,
@@ -221,6 +229,7 @@ class GraphStore {
       };
       this.state.traceSteps = [...this.state.traceSteps, newStep];
       this.traceStepIndex[newStep.nodeId] = this.state.traceSteps.length - 1;
+      this.state.traceMap = { ...this.state.traceMap, [step.nodeId]: newStep };
     }
     this.emit();
   }
@@ -300,6 +309,7 @@ class GraphStore {
       nodeMap: {},
       selectedNodeId: null,
       traceSteps: [],
+      traceMap: {},
       isRunning: false,
       isFallbackMode: true,
       history: [],
