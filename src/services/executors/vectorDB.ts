@@ -51,15 +51,16 @@ export const VectorDB = ({ node, incomingInput }: NodeExecutionContext): NodeExe
   let log = `Running VectorDB query on ${docs.length} documents using model: ${model} with threshold ${threshold}`;
 
   const queryFreq = getWordFrequency(queryStr);
-  const matches = docs
-    .reduce((acc: { doc: string; similarity: number }[], doc: string) => {
-      const docFreq = getCachedWordFrequency(doc);
-      const similarity = calculateCosineSimilarity(queryFreq, docFreq);
-      if (similarity >= threshold) {
-        acc.push({ doc, similarity });
-      }
-      return acc;
-    }, [])
+  const matchedItems: { doc: string; similarity: number }[] = [];
+  for (const doc of docs) {
+    const docFreq = getCachedWordFrequency(doc);
+    const similarity = calculateCosineSimilarity(queryFreq, docFreq);
+    if (similarity >= threshold) {
+      matchedItems.push({ doc, similarity });
+    }
+  }
+
+  const matches = matchedItems
     .sort((a, b) => b.similarity - a.similarity)
     .map(item => item.doc);
 
