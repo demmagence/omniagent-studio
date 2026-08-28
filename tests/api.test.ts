@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { validateEndpointUrl } from '../src/services/api';
+import { validateEndpointUrl, callLLM } from '../src/services/api';
 
 import { vi } from 'vitest';
 
@@ -120,5 +120,17 @@ describe('validateEndpointUrl', () => {
 
     // IPv4-mapped IPv6 pointing to metadata
     await expect(validateEndpointUrl('http://[::ffff:169.254.169.254]')).rejects.toThrow(errorMsgPrivate);
+  });
+});
+
+describe('callLLM validation integration', () => {
+  it('should propagate URL validation error when invalid endpoint URL format is provided', async () => {
+    await expect(
+      callLLM('openai', 'gpt-4o-mini', 'hello', { endpointUrl: 'invalid-url', fallback: false })
+    ).rejects.toThrow('Invalid endpoint URL format.');
+
+    await expect(
+      callLLM('ollama', 'llama3', 'hello', { endpointUrl: 'invalid-url', fallback: false })
+    ).rejects.toThrow('Invalid endpoint URL format.');
   });
 });
