@@ -1,6 +1,6 @@
 import ipaddr from 'ipaddr.js';
 
-const dnsCache = new Map<string, { type: number; data: string }[]>();
+const dnsCache = new Map<string, Promise<{ type: number; data: string }[]>>();
 const networkTypeCache = new Map<string, { isPrivate: boolean; isLocal: boolean }>();
 
 function checkIpStatus(ipStr: string, state: { isPrivate: boolean; isLocal: boolean }) {
@@ -41,30 +41,31 @@ function checkIpStatus(ipStr: string, state: { isPrivate: boolean; isLocal: bool
 
 async function resolveDohRecords(hostname: string, checkIp: (ipStr: string) => void) {
   const resolveType = async (type: string) => {
-    const processRecords = (records: { type: number; data: string }[]) => {
-      for (const record of records) {
-        if (record.type === 1 || record.type === 28) {
-          checkIp(record.data);
-        }
-      }
-    };
-
     const cacheKey = `${hostname}_${type}`;
-    if (dnsCache.has(cacheKey)) {
-      const cachedAnswer = dnsCache.get(cacheKey)!;
-      processRecords(cachedAnswer);
-      return;
+    let promise = dnsCache.get(cacheKey);
+    if (!promise) {
+      promise = (async () => {
+        try {
+          const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=${type}`, {
+            headers: { accept: 'application/dns-json' },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            return data.Answer || [];
+          }
+          return [];
+        } catch (err) {
+          dnsCache.delete(cacheKey);
+          throw err;
+        }
+      })();
+      dnsCache.set(cacheKey, promise);
     }
 
-    const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=${type}`, {
-      headers: { accept: 'application/dns-json' },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const answer = data.Answer || [];
-      dnsCache.set(cacheKey, answer);
-      if (answer) {
-        processRecords(answer);
+    const records = await promise;
+    for (const record of records) {
+      if (record.type === 1 || record.type === 28) {
+        checkIp(record.data);
       }
     }
   };
