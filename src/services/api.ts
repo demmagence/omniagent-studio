@@ -104,7 +104,7 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
     try {
       await resolveDohRecords(hostname, checkIp);
     } catch (e) {
-      console.warn('DNS over HTTPS resolution failed', e);
+      // Ignore resolution errors
     }
   }
 
