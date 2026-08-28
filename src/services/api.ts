@@ -23,7 +23,12 @@ function checkIpStatus(ipStr: string, state: { isPrivate: boolean; isLocal: bool
       } else if (
         range === 'private' ||
         range === 'uniqueLocal' ||
-        range === 'linkLocal'
+        range === 'linkLocal' ||
+        range === 'carrierGradeNat' ||
+        range === 'rfc6052' ||
+        range === 'rfc6145' ||
+        range === '6to4' ||
+        range === 'teredo'
       ) {
         state.isPrivate = true;
       }
