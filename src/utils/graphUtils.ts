@@ -63,29 +63,45 @@ function computeInDegreeAndAdjList(nodes: Node[], edges: Edge[]) {
 }
 
 export function hasCycle(nodes: Node[], edges: Edge[]): boolean {
-  const { adjList } = computeInDegreeAndAdjList(nodes, edges);
+  if (edges.length === 0) return false;
 
-  const visited = new Set<string>();
-  const recStack = new Set<string>();
+  const adjList = new Map<string, string[]>();
+  for (let i = 0; i < edges.length; i++) {
+    const edge = edges[i];
+    let list = adjList.get(edge.source);
+    if (!list) {
+      list = [];
+      adjList.set(edge.source, list);
+    }
+    list.push(edge.target);
+  }
+
+  // 0 = unvisited, 1 = visiting (in recursion stack), 2 = visited
+  const state = new Map<string, number>();
 
   function dfs(nodeId: string): boolean {
-    if (recStack.has(nodeId)) return true;
-    if (visited.has(nodeId)) return false;
+    const s = state.get(nodeId) || 0;
+    if (s === 1) return true;
+    if (s === 2) return false;
 
-    visited.add(nodeId);
-    recStack.add(nodeId);
+    state.set(nodeId, 1);
 
-    const neighbors = adjList.get(nodeId) || [];
-    for (const neighbor of neighbors) {
-      if (dfs(neighbor)) return true;
+    const neighbors = adjList.get(nodeId);
+    if (neighbors) {
+      for (let i = 0; i < neighbors.length; i++) {
+        if (dfs(neighbors[i])) return true;
+      }
     }
 
-    recStack.delete(nodeId);
+    state.set(nodeId, 2);
     return false;
   }
 
-  for (const node of nodes) {
-    if (dfs(node.id)) return true;
+  for (let i = 0; i < nodes.length; i++) {
+    const id = nodes[i].id;
+    if ((state.get(id) || 0) === 0) {
+      if (dfs(id)) return true;
+    }
   }
   return false;
 }
