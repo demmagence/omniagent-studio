@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, fireEvent, screen } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Node } from '../src/components/Node';
@@ -176,7 +175,7 @@ describe('Node Component', () => {
       nodes: [mockNode],
       edges: [],
       traceSteps: [],
-      status: 'completed'
+      status: 'success'
     });
     const runId = graphStore.getState().history[0].id;
     graphStore.selectRun(runId);
