@@ -1,11 +1,31 @@
-const WORD_REGEX = /\b\w+\b/g;
-
 export function getWordFrequency(text: string): Map<string, number> {
-  const words = text.toLowerCase().match(WORD_REGEX) || [];
   const freq = new Map<string, number>();
-  for (const w of words) {
+  let start = -1;
+  const len = text.length;
+
+  for (let i = 0; i < len; i++) {
+    const code = text.charCodeAt(i);
+    // \w corresponds to [a-zA-Z0-9_]
+    const isWordChar =
+      (code >= 97 && code <= 122) ||
+      (code >= 65 && code <= 90) ||
+      (code >= 48 && code <= 57) ||
+      code === 95;
+
+    if (isWordChar) {
+      if (start === -1) start = i;
+    } else if (start !== -1) {
+      const w = text.slice(start, i).toLowerCase();
+      freq.set(w, (freq.get(w) || 0) + 1);
+      start = -1;
+    }
+  }
+
+  if (start !== -1) {
+    const w = text.slice(start).toLowerCase();
     freq.set(w, (freq.get(w) || 0) + 1);
   }
+
   return freq;
 }
 

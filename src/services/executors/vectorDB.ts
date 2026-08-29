@@ -52,9 +52,15 @@ export const VectorDB = ({ node, incomingInput }: NodeExecutionContext): NodeExe
 
   const queryFreq = getWordFrequency(queryStr);
   const matchedItems: { doc: string; similarity: number }[] = [];
+  const similarityCache = new Map<string, number>();
+
   for (const doc of docs) {
-    const docFreq = getCachedWordFrequency(doc);
-    const similarity = calculateCosineSimilarity(queryFreq, docFreq);
+    let similarity = similarityCache.get(doc);
+    if (similarity === undefined) {
+      const docFreq = getCachedWordFrequency(doc);
+      similarity = calculateCosineSimilarity(queryFreq, docFreq);
+      similarityCache.set(doc, similarity);
+    }
     if (similarity >= threshold) {
       matchedItems.push({ doc, similarity });
     }
