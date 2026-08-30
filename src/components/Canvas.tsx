@@ -23,26 +23,7 @@ const getEdgeStyle = (status: string | null) => {
   return { strokeColor, className, opacity };
 };
 
-export const Canvas: React.FC = () => {
-  const { nodes, edges, selectedNodeId, selectedRunId, traceMap = {}, nodeMap = {} } = useGraphStore();
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [activeConnection, setActiveConnection] = useState<{
-    nodeId: string;
-    portType: 'in' | 'out';
-    currentX: number;
-    currentY: number;
-  } | null>(null);
-
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const zoomRef = useRef(zoom);
-  const panRef = useRef(pan);
-
-  useEffect(() => {
-    zoomRef.current = zoom;
-    panRef.current = pan;
-  }, [zoom, pan]);
-
+const useCanvasKeyboardShortcuts = (selectedNodeId: string | null, selectedRunId: string | null) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement as HTMLElement | null;
@@ -79,6 +60,19 @@ export const Canvas: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [selectedNodeId, selectedRunId]);
+};
+
+const useCanvasZoomPan = (canvasRef: React.RefObject<HTMLDivElement>, nodes: Array<{ position: { x: number; y: number } }>) => {
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+
+  const zoomRef = useRef(zoom);
+  const panRef = useRef(pan);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+    panRef.current = pan;
+  }, [zoom, pan]);
 
   useEffect(() => {
     const canvasEl = canvasRef.current;
@@ -110,7 +104,7 @@ export const Canvas: React.FC = () => {
     return () => {
       canvasEl.removeEventListener('wheel', handleWheelNative);
     };
-  }, []);
+  }, [canvasRef]);
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -152,138 +146,8 @@ export const Canvas: React.FC = () => {
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  const startDragNode = (nodeId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    
-    graphStore.selectNode(nodeId);
-
-    const target = e.target as HTMLElement;
-    if (
-      target.tagName === 'INPUT' ||
-      target.tagName === 'SELECT' ||
-      target.tagName === 'BUTTON' ||
-      target.tagName === 'OPTION' ||
-      target.closest('.port-input') ||
-      target.closest('.port-output')
-    ) {
-      return;
-    }
-
-    const initialMouseX = e.clientX;
-    const initialMouseY = e.clientY;
-    const targetNode = nodeMap[nodeId];
-    if (!targetNode) return;
-    const initialNodeX = targetNode.position.x;
-    const initialNodeY = targetNode.position.y;
-
-    let savedState = false;
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const z = zoomRef.current;
-      const dx = (moveEvent.clientX - initialMouseX) / z;
-      const dy = (moveEvent.clientY - initialMouseY) / z;
-      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-        if (!savedState) {
-          graphStore.saveHistoryState();
-          savedState = true;
-        }
-      }
-      graphStore.updateNodePosition(nodeId, {
-        x: initialNodeX + dx,
-        y: initialNodeY + dy,
-      });
-    };
-
-    const handleMouseUp = () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-  };
-
-  const startConnect = (nodeId: string, portType: 'in' | 'out', e: React.MouseEvent) => {
-    if (selectedRunId !== null) return;
-    e.stopPropagation();
-    e.preventDefault();
-
-    const canvasEl = canvasRef.current;
-    if (!canvasEl) return;
-    const rect = canvasEl.getBoundingClientRect();
-    
-    const z = zoomRef.current;
-    const p = panRef.current;
-    
-    const initX = (e.clientX - rect.left - p.x) / z;
-    const initY = (e.clientY - rect.top - p.y) / z;
-
-    setActiveConnection({
-      nodeId,
-      portType,
-      currentX: initX,
-      currentY: initY,
-    });
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const canvasElLatest = canvasRef.current;
-      if (!canvasElLatest) return;
-      const r = canvasElLatest.getBoundingClientRect();
-      const zLatest = zoomRef.current;
-      const pLatest = panRef.current;
-      
-      const currX = (moveEvent.clientX - r.left - pLatest.x) / zLatest;
-      const currY = (moveEvent.clientY - r.top - pLatest.y) / zLatest;
-      
-      setActiveConnection({
-        nodeId,
-        portType,
-        currentX: currX,
-        currentY: currY,
-      });
-    };
-
-    const handleMouseUp = (upEvent: MouseEvent) => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-
-      const element = document.elementFromPoint(upEvent.clientX, upEvent.clientY) as HTMLElement | null;
-      const portElement = element?.closest('[data-port-node-id]');
-      if (portElement) {
-        const targetNodeId = portElement.getAttribute('data-port-node-id');
-        const targetPortType = portElement.getAttribute('data-port-type');
-        if (targetNodeId && targetPortType && targetNodeId !== nodeId) {
-          if (portType === 'out' && targetPortType === 'in') {
-            graphStore.addEdge(nodeId, targetNodeId);
-          } else if (portType === 'in' && targetPortType === 'out') {
-            graphStore.addEdge(targetNodeId, nodeId);
-          }
-        }
-      }
-      setActiveConnection(null);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-  };
-
-  const getBezierPath = (x1: number, y1: number, x2: number, y2: number) => {
-    const dx = Math.abs(x2 - x1);
-    const cx1 = x1 + Math.max(50, dx / 2);
-    const cy1 = y1;
-    const cx2 = x2 - Math.max(50, dx / 2);
-    const cy2 = y2;
-    return `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
-  };
-
-  const handleZoomIn = () => {
-    setZoom((z) => Math.min(3, z * 1.15));
-  };
-
-  const handleZoomOut = () => {
-    setZoom((z) => Math.max(0.1, z / 1.15));
-  };
-
+  const handleZoomIn = () => setZoom((z) => Math.min(3, z * 1.15));
+  const handleZoomOut = () => setZoom((z) => Math.max(0.1, z / 1.15));
   const handleResetView = () => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
@@ -329,6 +193,184 @@ export const Canvas: React.FC = () => {
     setZoom(nextZoom);
     setPan({ x: nextPanX, y: nextPanY });
   };
+
+  return {
+    zoom,
+    pan,
+    zoomRef,
+    panRef,
+    handleCanvasMouseDown,
+    handleZoomIn,
+    handleZoomOut,
+    handleResetView,
+    handleFitToScreen,
+  };
+};
+
+const useNodeDrag = (nodeMap: Record<string, any>, zoomRef: React.RefObject<number>) => {
+  const startDragNode = (nodeId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    graphStore.selectNode(nodeId);
+
+    const target = e.target as HTMLElement;
+    if (
+      target.tagName === 'INPUT' ||
+      target.tagName === 'SELECT' ||
+      target.tagName === 'BUTTON' ||
+      target.tagName === 'OPTION' ||
+      target.closest('.port-input') ||
+      target.closest('.port-output')
+    ) {
+      return;
+    }
+
+    const initialMouseX = e.clientX;
+    const initialMouseY = e.clientY;
+    const targetNode = nodeMap[nodeId];
+    if (!targetNode) return;
+    const initialNodeX = targetNode.position.x;
+    const initialNodeY = targetNode.position.y;
+
+    let savedState = false;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const z = zoomRef.current ?? 1;
+      const dx = (moveEvent.clientX - initialMouseX) / z;
+      const dy = (moveEvent.clientY - initialMouseY) / z;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        if (!savedState) {
+          graphStore.saveHistoryState();
+          savedState = true;
+        }
+      }
+      graphStore.updateNodePosition(nodeId, {
+        x: initialNodeX + dx,
+        y: initialNodeY + dy,
+      });
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  return { startDragNode };
+};
+
+const useActiveConnection = (
+  canvasRef: React.RefObject<HTMLDivElement>,
+  zoomRef: React.RefObject<number>,
+  panRef: React.RefObject<{ x: number; y: number }>,
+  selectedRunId: string | null
+) => {
+  const [activeConnection, setActiveConnection] = useState<{
+    nodeId: string;
+    portType: 'in' | 'out';
+    currentX: number;
+    currentY: number;
+  } | null>(null);
+
+  const startConnect = (nodeId: string, portType: 'in' | 'out', e: React.MouseEvent) => {
+    if (selectedRunId !== null) return;
+    e.stopPropagation();
+    e.preventDefault();
+
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+    const rect = canvasEl.getBoundingClientRect();
+    
+    const z = zoomRef.current ?? 1;
+    const p = panRef.current ?? { x: 0, y: 0 };
+    
+    const initX = (e.clientX - rect.left - p.x) / z;
+    const initY = (e.clientY - rect.top - p.y) / z;
+
+    setActiveConnection({
+      nodeId,
+      portType,
+      currentX: initX,
+      currentY: initY,
+    });
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const canvasElLatest = canvasRef.current;
+      if (!canvasElLatest) return;
+      const r = canvasElLatest.getBoundingClientRect();
+      const zLatest = zoomRef.current ?? 1;
+      const pLatest = panRef.current ?? { x: 0, y: 0 };
+      
+      const currX = (moveEvent.clientX - r.left - pLatest.x) / zLatest;
+      const currY = (moveEvent.clientY - r.top - pLatest.y) / zLatest;
+      
+      setActiveConnection({
+        nodeId,
+        portType,
+        currentX: currX,
+        currentY: currY,
+      });
+    };
+
+    const handleMouseUp = (upEvent: MouseEvent) => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+
+      const element = document.elementFromPoint(upEvent.clientX, upEvent.clientY) as HTMLElement | null;
+      const portElement = element?.closest('[data-port-node-id]');
+      if (portElement) {
+        const targetNodeId = portElement.getAttribute('data-port-node-id');
+        const targetPortType = portElement.getAttribute('data-port-type');
+        if (targetNodeId && targetPortType && targetNodeId !== nodeId) {
+          if (portType === 'out' && targetPortType === 'in') {
+            graphStore.addEdge(nodeId, targetNodeId);
+          } else if (portType === 'in' && targetPortType === 'out') {
+            graphStore.addEdge(targetNodeId, nodeId);
+          }
+        }
+      }
+      setActiveConnection(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  return { activeConnection, startConnect };
+};
+
+const getBezierPath = (x1: number, y1: number, x2: number, y2: number) => {
+  const dx = Math.abs(x2 - x1);
+  const cx1 = x1 + Math.max(50, dx / 2);
+  const cy1 = y1;
+  const cx2 = x2 - Math.max(50, dx / 2);
+  const cy2 = y2;
+  return `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
+};
+
+export const Canvas: React.FC = () => {
+  const { nodes, edges, selectedNodeId, selectedRunId, traceMap = {}, nodeMap = {} } = useGraphStore();
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  useCanvasKeyboardShortcuts(selectedNodeId, selectedRunId);
+
+  const {
+    zoom,
+    pan,
+    zoomRef,
+    panRef,
+    handleCanvasMouseDown,
+    handleZoomIn,
+    handleZoomOut,
+    handleResetView,
+    handleFitToScreen,
+  } = useCanvasZoomPan(canvasRef, nodes);
+
+  const { startDragNode } = useNodeDrag(nodeMap, zoomRef);
+  const { activeConnection, startConnect } = useActiveConnection(canvasRef, zoomRef, panRef, selectedRunId);
 
   const handleCanvasClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
