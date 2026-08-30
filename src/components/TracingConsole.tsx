@@ -2,9 +2,7 @@ import React from 'react';
 import { useGraphStore } from '../store/graphStore';
 import { executeWorkflow } from '../services/executor';
 
-export const TracingConsole: React.FC = () => {
-  const { traceSteps, isRunning, nodes, selectedRunId, nodeMap = {} } = useGraphStore();
-  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+const useExecutionTimer = (isRunning: boolean) => {
   const [elapsedTime, setElapsedTime] = React.useState<number>(0);
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = React.useRef<number>(0);
@@ -31,6 +29,111 @@ export const TracingConsole: React.FC = () => {
       }
     };
   }, [isRunning]);
+
+  return elapsedTime;
+};
+
+interface ExecutionStatsProps {
+  completedCount: number;
+  failedCount: number;
+  pendingCount: number;
+  runningCount: number;
+  elapsedTime: number;
+}
+
+const ExecutionStats: React.FC<ExecutionStatsProps> = ({
+  completedCount,
+  failedCount,
+  pendingCount,
+  runningCount,
+  elapsedTime
+}) => (
+  <div
+    data-testid="execution-stats"
+    style={{
+      display: 'flex',
+      gap: '16px',
+      backgroundColor: '#111827',
+      padding: '8px 12px',
+      borderRadius: '4px',
+      fontSize: '12px',
+      color: '#9ca3af',
+      border: '1px solid #374151',
+    }}
+  >
+    <div>
+      Completed: <strong style={{ color: '#10b981' }} data-testid="stats-completed">{completedCount}</strong>
+    </div>
+    <div>
+      Failed: <strong style={{ color: '#ef4444' }} data-testid="stats-failed">{failedCount}</strong>
+    </div>
+    <div>
+      Pending: <strong style={{ color: '#9ca3af' }} data-testid="stats-pending">{pendingCount}</strong>
+    </div>
+    {runningCount > 0 && (
+      <div>
+        Running: <strong style={{ color: '#fbbf24' }} data-testid="stats-running">{runningCount}</strong>
+      </div>
+    )}
+    <div>
+      Elapsed Time:{' '}
+      <strong style={{ color: '#60a5fa' }} data-testid="stats-elapsed">
+        {(elapsedTime / 1000).toFixed(2)}s
+      </strong>
+    </div>
+  </div>
+);
+
+interface TraceStepItemProps {
+  step: any;
+  nodeLabel: string;
+}
+
+const TraceStepItem: React.FC<TraceStepItemProps> = ({ step, nodeLabel }) => {
+  const statusColors: Record<string, string> = {
+    pending: '#9ca3af',
+    running: '#fbbf24',
+    completed: '#34d399',
+    failed: '#f87171'
+  };
+
+  const borderStyleColor = statusColors[step.status] || '#9ca3af';
+
+  return (
+    <div
+      data-testid={`trace-step-${step.nodeId}`}
+      style={{
+        borderLeft: `4px solid ${borderStyleColor}`,
+        backgroundColor: '#111827',
+        padding: '8px 12px',
+        borderRadius: '0 4px 4px 0',
+        fontSize: '13px'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+        <span>{nodeLabel}</span>
+        <span style={{ color: borderStyleColor }} data-testid={`trace-status-${step.nodeId}`}>
+          {step.status ? step.status.toUpperCase() : ''}
+        </span>
+      </div>
+      <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
+        {step.log && <div><strong>Log:</strong> {step.log}</div>}
+        {step.input !== null && step.input !== undefined && (
+          <div><strong>Input:</strong> {typeof step.input === 'object' ? JSON.stringify(step.input) : String(step.input)}</div>
+        )}
+        {step.output !== null && step.output !== undefined && (
+          <div><strong>Output:</strong> {typeof step.output === 'object' ? JSON.stringify(step.output) : String(step.output)}</div>
+        )}
+        {(step.tokensConsumed !== undefined && step.tokensConsumed > 0) && <div><strong>Tokens:</strong> {step.tokensConsumed}</div>}
+      </div>
+    </div>
+  );
+};
+
+export const TracingConsole: React.FC = () => {
+  const { traceSteps, isRunning, nodes, selectedRunId, nodeMap = {} } = useGraphStore();
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+  const elapsedTime = useExecutionTimer(isRunning);
 
   const handleRun = async () => {
     setErrorMsg(null);
@@ -94,40 +197,13 @@ export const TracingConsole: React.FC = () => {
       </div>
 
       {traceSteps.length > 0 && (
-        <div
-          data-testid="execution-stats"
-          style={{
-            display: 'flex',
-            gap: '16px',
-            backgroundColor: '#111827',
-            padding: '8px 12px',
-            borderRadius: '4px',
-            fontSize: '12px',
-            color: '#9ca3af',
-            border: '1px solid #374151',
-          }}
-        >
-          <div>
-            Completed: <strong style={{ color: '#10b981' }} data-testid="stats-completed">{completedCount}</strong>
-          </div>
-          <div>
-            Failed: <strong style={{ color: '#ef4444' }} data-testid="stats-failed">{failedCount}</strong>
-          </div>
-          <div>
-            Pending: <strong style={{ color: '#9ca3af' }} data-testid="stats-pending">{pendingCount}</strong>
-          </div>
-          {runningCount > 0 && (
-            <div>
-              Running: <strong style={{ color: '#fbbf24' }} data-testid="stats-running">{runningCount}</strong>
-            </div>
-          )}
-          <div>
-            Elapsed Time:{' '}
-            <strong style={{ color: '#60a5fa' }} data-testid="stats-elapsed">
-              {(elapsedTime / 1000).toFixed(2)}s
-            </strong>
-          </div>
-        </div>
+        <ExecutionStats
+          completedCount={completedCount}
+          failedCount={failedCount}
+          pendingCount={pendingCount}
+          runningCount={runningCount}
+          elapsedTime={elapsedTime}
+        />
       )}
 
       {errorMsg && (
@@ -146,41 +222,12 @@ export const TracingConsole: React.FC = () => {
           traceSteps.map((step, index) => {
             const node = nodeMap[step.nodeId];
             const label = node?.data.label || step.nodeId;
-            const statusColors = {
-              pending: '#9ca3af',
-              running: '#fbbf24',
-              completed: '#34d399',
-              failed: '#f87171'
-            };
             return (
-              <div
+              <TraceStepItem
                 key={`${step.nodeId}-${index}`}
-                data-testid={`trace-step-${step.nodeId}`}
-                style={{
-                  borderLeft: `4px solid ${statusColors[step.status]}`,
-                  backgroundColor: '#111827',
-                  padding: '8px 12px',
-                  borderRadius: '0 4px 4px 0',
-                  fontSize: '13px'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                  <span>{label}</span>
-                  <span style={{ color: statusColors[step.status] }} data-testid={`trace-status-${step.nodeId}`}>
-                    {step.status.toUpperCase()}
-                  </span>
-                </div>
-                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
-                  {step.log && <div><strong>Log:</strong> {step.log}</div>}
-                  {step.input !== null && step.input !== undefined && (
-                    <div><strong>Input:</strong> {typeof step.input === 'object' ? JSON.stringify(step.input) : String(step.input)}</div>
-                  )}
-                  {step.output !== null && step.output !== undefined && (
-                    <div><strong>Output:</strong> {typeof step.output === 'object' ? JSON.stringify(step.output) : String(step.output)}</div>
-                  )}
-                  {(step.tokensConsumed !== undefined && step.tokensConsumed > 0) && <div><strong>Tokens:</strong> {step.tokensConsumed}</div>}
-                </div>
-              </div>
+                step={step}
+                nodeLabel={label}
+              />
             );
           })
         )}
