@@ -149,6 +149,8 @@ describe('graphStoreHelpers', () => {
         {
           nodeId: 'n2',
           status: 'running',
+          input: undefined,
+          output: undefined,
         },
       ];
 
