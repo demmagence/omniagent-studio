@@ -2,8 +2,8 @@ import { graphStore } from '../store/graphStore';
 import { Node, TraceStep, Edge } from '../types';
 
 export { getWordFrequency, calculateCosineSimilarity } from './executors/utils';
-import { nodeExecutors, type ExecutionOptions, type NodeExecutionContext, type NodeExecutionResult } from './executors';
-export type { ExecutionOptions, NodeExecutionResult, NodeExecutionContext };
+import { nodeExecutors, type ExecutionOptions, type NodeExecutionContext } from './executors';
+export type { ExecutionOptions, NodeExecutionContext };
 
 class WorkflowExecutor {
   private nodes: Node[];
