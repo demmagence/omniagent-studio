@@ -86,8 +86,9 @@ class WorkflowExecutor {
       if (degree === 0) queue.push(nodeId);
     }
 
-    while (queue.length > 0) {
-      const current = queue.shift()!;
+    let head = 0;
+    while (head < queue.length) {
+      const current = queue[head++]!;
       count++;
 
       const edges = this.outgoingEdgesMap.get(current) || [];
