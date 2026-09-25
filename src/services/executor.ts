@@ -17,6 +17,7 @@ class WorkflowExecutor {
   private outgoingEdgesMap: Map<string, Edge[]>;
   private pendingDependencies: Map<string, number>;
   private readyNodesQueue: Node[];
+  private readyNodesHead: number;
   private completedNodes: Set<string>;
   private runningNodes: Set<string>;
   private aborted: boolean;
@@ -40,6 +41,7 @@ class WorkflowExecutor {
     this.outgoingEdgesMap = new Map<string, Edge[]>();
     this.pendingDependencies = new Map<string, number>();
     this.readyNodesQueue = [];
+    this.readyNodesHead = 0;
 
     for (const node of this.nodes) {
       this.pendingDependencies.set(node.id, 0);
@@ -86,8 +88,9 @@ class WorkflowExecutor {
       if (degree === 0) queue.push(nodeId);
     }
 
-    while (queue.length > 0) {
-      const current = queue.shift()!;
+    let head = 0;
+    while (head < queue.length) {
+      const current = queue[head++];
       count++;
 
       const edges = this.outgoingEdgesMap.get(current) || [];
@@ -171,6 +174,11 @@ class WorkflowExecutor {
       return;
     }
 
+    if (this.readyNodesHead >= this.readyNodesQueue.length) {
+      this.readyNodesQueue = [];
+      this.readyNodesHead = 0;
+    }
+
     if (this.readyNodesQueue.length === 0 && this.runningNodes.size === 0) {
       if (this.completedNodes.size === this.nodes.length) {
         this.resolveRun(graphStore.getState().traceSteps);
@@ -187,8 +195,8 @@ class WorkflowExecutor {
       return;
     }
 
-    while (this.readyNodesQueue.length > 0 && this.runningNodes.size < this.maxConcurrency) {
-      const node = this.readyNodesQueue.shift()!;
+    while (this.readyNodesHead < this.readyNodesQueue.length && this.runningNodes.size < this.maxConcurrency) {
+      const node = this.readyNodesQueue[this.readyNodesHead++]!;
 
       if (this.runningNodes.has(node.id) || this.completedNodes.has(node.id)) {
         continue;
