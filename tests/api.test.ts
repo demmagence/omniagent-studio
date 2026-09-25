@@ -123,7 +123,7 @@ describe('validateEndpointUrl', () => {
   });
 });
 
-describe('callLLM validation integration', () => {
+describe('callLLM', () => {
   it('should propagate URL validation error when invalid endpoint URL format is provided', async () => {
     await expect(
       callLLM('openai', 'gpt-4o-mini', 'hello', { endpointUrl: 'invalid-url', fallback: false })
@@ -132,5 +132,113 @@ describe('callLLM validation integration', () => {
     await expect(
       callLLM('ollama', 'llama3', 'hello', { endpointUrl: 'invalid-url', fallback: false })
     ).rejects.toThrow('Invalid endpoint URL format.');
+  });
+
+  it('should propagate URL validation error for forbidden private endpoint URLs', async () => {
+    await expect(
+      callLLM('openai', 'gpt-4o-mini', 'hello', { endpointUrl: 'http://10.0.0.1', fallback: false })
+    ).rejects.toThrow('Access to private network or metadata addresses is forbidden.');
+  });
+
+  it('should handle fallback option with and without system prompt', async () => {
+    const resWithoutSystem = await callLLM('openai', 'gpt-4o-mini', 'Test prompt', { fallback: true });
+    expect(resWithoutSystem.text).toBe('[Simulated openai - Model: gpt-4o-mini] Response to: "Test prompt"');
+    expect(resWithoutSystem.tokensUsed).toBe(Math.ceil('Test prompt'.length / 4) + 15);
+
+    const resWithSystem = await callLLM('ollama', 'llama3', 'Test prompt', {
+      fallback: true,
+      systemPrompt: 'Be concise',
+    });
+    expect(resWithSystem.text).toBe(
+      'System directive: Be concise\n\n[Simulated ollama - Model: llama3] Response to: "Test prompt"'
+    );
+  });
+
+  it('should throw error when OpenAI API returns non-ok HTTP status', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: async () => 'Unauthorized',
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    await expect(
+      callLLM('openai', 'gpt-4o', 'Hello', { apiKey: 'invalid-key' })
+    ).rejects.toThrow('OpenAI API failed with status 401: Unauthorized');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('should throw error when Ollama API returns non-ok HTTP status', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: async () => 'Internal Error',
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    await expect(
+      callLLM('ollama', 'llama3', 'Hello', { endpointUrl: 'http://localhost:11434/api/generate' })
+    ).rejects.toThrow('Ollama API failed with status 500: Internal Error');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('should successfully return parsed response and default empty fallbacks for OpenAI', async () => {
+    // Test normal response
+    let mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: 'Hello human' } }],
+        usage: { total_tokens: 25 },
+      }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const result = await callLLM('openai', 'gpt-4o', 'Hi', { apiKey: 'key-123' });
+    expect(result).toEqual({ text: 'Hello human', tokensUsed: 25 });
+
+    // Test response missing choices and usage
+    mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const resultEmpty = await callLLM('openai', '', 'Hi');
+    expect(resultEmpty).toEqual({ text: '', tokensUsed: 0 });
+
+    vi.unstubAllGlobals();
+  });
+
+  it('should successfully return parsed response and default empty fallbacks for Ollama', async () => {
+    // Test normal response
+    let mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        response: 'Ollama answer',
+      }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const result = await callLLM('ollama', 'llama3', 'Hello Ollama', {
+      endpointUrl: 'http://localhost:11434/api/generate',
+      systemPrompt: 'Sys prompt',
+    });
+    expect(result.text).toBe('Ollama answer');
+    expect(result.tokensUsed).toBe(Math.ceil(('Ollama answer'.length + 'Hello Ollama'.length) / 4));
+
+    // Test response missing response field
+    mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const resultEmpty = await callLLM('ollama', '', 'Hi');
+    expect(resultEmpty.text).toBe('');
+    expect(resultEmpty.tokensUsed).toBe(Math.ceil('Hi'.length / 4));
+
+    vi.unstubAllGlobals();
   });
 });
