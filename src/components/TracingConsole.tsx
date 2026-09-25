@@ -1,6 +1,7 @@
 import React from 'react';
 import { useGraphStore } from '../store/graphStore';
 import { executeWorkflow } from '../services/executor';
+import type { TraceStep } from '../types';
 
 const useExecutionTimer = (isRunning: boolean) => {
   const [elapsedTime, setElapsedTime] = React.useState<number>(0);
@@ -85,7 +86,7 @@ const ExecutionStats: React.FC<ExecutionStatsProps> = ({
 );
 
 interface TraceStepItemProps {
-  step: any;
+  step: TraceStep;
   nodeLabel: string;
 }
 
