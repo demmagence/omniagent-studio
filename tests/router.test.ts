@@ -60,6 +60,20 @@ describe('Router executor', () => {
     expect(result.nodeOutput).toBe('Default Route');
   });
 
+  it('should fall back to Default Route for edge case inputs like null, false, 0, and empty object', () => {
+    const nullResult = Router(createMockContext(null, 'my-rules'));
+    expect(nullResult.nodeOutput).toBe('Default Route');
+
+    const falseResult = Router(createMockContext(false, 'my-rules'));
+    expect(falseResult.nodeOutput).toBe('Default Route');
+
+    const zeroResult = Router(createMockContext(0, 'my-rules'));
+    expect(zeroResult.nodeOutput).toBe('Default Route');
+
+    const emptyObjResult = Router(createMockContext({}, 'my-rules'));
+    expect(emptyObjResult.nodeOutput).toBe('Default Route');
+  });
+
   it('should format log string properly', () => {
     const result = Router(createMockContext('hello', 'my-rules'));
     expect(result.log).toBe('Routing input based on rules: my-rules');
