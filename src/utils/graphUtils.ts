@@ -1,24 +1,13 @@
 import { Node, Edge } from '../types';
 
 export function serializeGraph(nodes: Node[], edges: Edge[]): string {
-  let hasApiKey = false;
-  for (let i = 0; i < nodes.length; i++) {
-    if (nodes[i].data?.apiKey) {
-      hasApiKey = true;
-      break;
+  const sanitizedNodes = nodes.map(node => {
+    if (node.data && 'apiKey' in node.data) {
+      const { apiKey, ...restData } = node.data;
+      return { ...node, data: restData };
     }
-  }
-
-  let sanitizedNodes = nodes;
-  if (hasApiKey) {
-    sanitizedNodes = nodes.map(node => {
-      if (node.data && node.data.apiKey) {
-        const { apiKey, ...restData } = node.data;
-        return { ...node, data: restData };
-      }
-      return node;
-    });
-  }
+    return node;
+  });
   return JSON.stringify({ nodes: sanitizedNodes, edges }, null, 2);
 }
 
