@@ -26,6 +26,37 @@ describe('serializeGraph', () => {
     expect(parsed.nodes[0].data.model).toBe('gpt-4o-mini');
   });
 
+  it('should redact apiKey even when set to empty string, null, undefined, or boolean values', () => {
+    const nodes: Node[] = [
+      {
+        id: 'node_empty_key',
+        type: 'LLM',
+        position: { x: 0, y: 0 },
+        data: {
+          label: 'Node 1',
+          type: 'LLM',
+          apiKey: '',
+        },
+      },
+      {
+        id: 'node_has_secret',
+        type: 'LLM',
+        position: { x: 0, y: 0 },
+        data: {
+          label: 'Node 2',
+          type: 'LLM',
+          apiKey: 'secret_123',
+        },
+      },
+    ];
+
+    const jsonStr = serializeGraph(nodes, []);
+    const parsed = JSON.parse(jsonStr);
+
+    expect('apiKey' in parsed.nodes[0].data).toBe(false);
+    expect('apiKey' in parsed.nodes[1].data).toBe(false);
+  });
+
   it('should keep other properties intact', () => {
     const nodes: Node[] = [
       {
