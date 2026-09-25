@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useGraphStore, graphStore } from '../store/graphStore';
+import { Node as NodeType } from '../types';
 import { Node } from './Node';
 import { WorkspaceControls } from './WorkspaceControls';
 import { ConnectionsPanel } from './ConnectionsPanel';
@@ -207,7 +208,7 @@ const useCanvasZoomPan = (canvasRef: React.RefObject<HTMLDivElement>, nodes: Arr
   };
 };
 
-const useNodeDrag = (nodeMap: Record<string, any>, zoomRef: React.RefObject<number>) => {
+const useNodeDrag = (nodeMap: Record<string, NodeType>, zoomRef: React.RefObject<number>) => {
   const startDragNode = (nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
