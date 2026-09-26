@@ -112,7 +112,7 @@ describe('TracingConsole', () => {
     expect(screen.getByText('node-3')).toBeInTheDocument(); // fallback to id
   });
 
-  it('displays error when executeWorkflow fails', async () => {
+  it('displays error when executeWorkflow fails with an Error instance', async () => {
     vi.mocked(useGraphStore).mockReturnValue({
       traceSteps: [],
       isRunning: false,
@@ -133,6 +133,30 @@ describe('TracingConsole', () => {
     await waitFor(() => {
       expect(screen.getByTestId('execution-error')).toBeInTheDocument();
       expect(screen.getByText(/Execution failed!/)).toBeInTheDocument();
+    });
+  });
+
+  it('displays error string when executeWorkflow fails with a non-Error rejection', async () => {
+    vi.mocked(useGraphStore).mockReturnValue({
+      traceSteps: [],
+      isRunning: false,
+      nodes: [{ id: 'node-1', data: { label: 'Node 1' } }], nodeMap: { 'node-1': { id: 'node-1', data: { label: 'Node 1' } } },
+      selectedRunId: null,
+    } as any);
+
+    vi.mocked(executeWorkflow).mockRejectedValueOnce('String execution error');
+
+    render(<TracingConsole />);
+
+    const runBtn = screen.getByTestId('run-workflow-btn');
+
+    await act(async () => {
+      fireEvent.click(runBtn);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('execution-error')).toBeInTheDocument();
+      expect(screen.getByText(/String execution error/)).toBeInTheDocument();
     });
   });
 
