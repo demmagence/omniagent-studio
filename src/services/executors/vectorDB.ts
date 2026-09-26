@@ -4,7 +4,12 @@ import { getWordFrequency, calculateCosineSimilarity } from './utils';
 const docFreqCache = new Map<string, Map<string, number>>();
 const CACHE_LIMIT = 5000;
 
-const parsedDocsCache = new Map<string, string[]>();
+interface ParsedDoc {
+  doc: string;
+  freq: Map<string, number>;
+}
+
+const parsedDocsCache = new Map<string, ParsedDoc[]>();
 const PARSED_CACHE_LIMIT = 100;
 
 function getCachedWordFrequency(doc: string): Map<string, number> {
@@ -35,7 +40,11 @@ export const VectorDB = ({ node, incomingInput }: NodeExecutionContext): NodeExe
     docs = rawDocs
       .split('\n')
       .map((d: string) => d.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .map((doc: string) => ({
+        doc,
+        freq: getCachedWordFrequency(doc)
+      }));
 
     if (parsedDocsCache.size >= PARSED_CACHE_LIMIT) {
       const firstKey = parsedDocsCache.keys().next().value;
@@ -54,10 +63,9 @@ export const VectorDB = ({ node, incomingInput }: NodeExecutionContext): NodeExe
   const matchedItems: { doc: string; similarity: number }[] = [];
   const similarityCache = new Map<string, number>();
 
-  for (const doc of docs) {
+  for (const { doc, freq: docFreq } of docs) {
     let similarity = similarityCache.get(doc);
     if (similarity === undefined) {
-      const docFreq = getCachedWordFrequency(doc);
       similarity = calculateCosineSimilarity(queryFreq, docFreq);
       similarityCache.set(doc, similarity);
     }
