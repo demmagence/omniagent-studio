@@ -130,4 +130,40 @@ describe('Sidebar Component', () => {
     expect(graphUtils.deserializeGraph).toHaveBeenCalledWith('{"mock": "import"}');
     expect(setGraphSpy).toHaveBeenCalled();
   });
+
+  it('handles import error with Error instance', () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.mocked(graphUtils.deserializeGraph).mockImplementationOnce(() => {
+      throw new Error('Invalid graph structure');
+    });
+
+    render(<Sidebar />);
+
+    const importInput = screen.getByTestId('import-input');
+    fireEvent.change(importInput, { target: { value: 'invalid json' } });
+
+    const importBtn = screen.getByTestId('import-btn');
+    fireEvent.click(importBtn);
+
+    expect(alertSpy).toHaveBeenCalledWith('Invalid graph structure');
+    alertSpy.mockRestore();
+  });
+
+  it('handles import error with non-Error value', () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.mocked(graphUtils.deserializeGraph).mockImplementationOnce(() => {
+      throw 'string error';
+    });
+
+    render(<Sidebar />);
+
+    const importInput = screen.getByTestId('import-input');
+    fireEvent.change(importInput, { target: { value: 'invalid json' } });
+
+    const importBtn = screen.getByTestId('import-btn');
+    fireEvent.click(importBtn);
+
+    expect(alertSpy).toHaveBeenCalledWith('Import failed');
+    alertSpy.mockRestore();
+  });
 });
