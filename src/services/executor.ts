@@ -113,7 +113,7 @@ class WorkflowExecutor {
     if (incomingEdges.length === 1) {
       return this.outputs.get(incomingEdges[0].source);
     }
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
     incomingEdges.forEach((edge, idx) => {
       const sourceNode = this.nodeMap.get(edge.source);
       const key = edge.sourcePort || sourceNode?.data.label || `input_${idx}`;
