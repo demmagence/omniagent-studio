@@ -205,8 +205,8 @@ describe('callLLM', () => {
     expect(result.text).toBe('Pinned response');
     const targetCall = mockFetch.mock.calls.find((call) => call[0].toString().includes('/v1/chat/completions'));
     expect(targetCall).toBeDefined();
-    expect(targetCall[0].toString()).toBe('https://93.184.216.34/v1/chat/completions');
-    expect(targetCall[1].headers.Host).toBe('api.openai.com');
+    expect(targetCall![0].toString()).toBe('https://93.184.216.34/v1/chat/completions');
+    expect(targetCall![1].headers.Host).toBe('api.openai.com');
 
     vi.unstubAllGlobals();
   });
