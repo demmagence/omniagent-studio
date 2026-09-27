@@ -1,7 +1,7 @@
 import ipaddr from 'ipaddr.js';
 
 const dnsCache = new Map<string, Promise<{ type: number; data: string }[]>>();
-const networkTypeCache = new Map<string, { isPrivate: boolean; isLocal: boolean }>();
+const networkTypeCache = new Map<string, { isPrivate: boolean; isLocal: boolean; resolvedIp?: string }>();
 
 function checkIpStatus(ipStr: string, state: { isPrivate: boolean; isLocal: boolean }) {
   if (ipaddr.isValid(ipStr)) {
@@ -44,7 +44,8 @@ function checkIpStatus(ipStr: string, state: { isPrivate: boolean; isLocal: bool
   }
 }
 
-async function resolveDohRecords(hostname: string, checkIp: (ipStr: string) => void) {
+async function resolveDohRecords(hostname: string, checkIp: (ipStr: string) => void): Promise<string[]> {
+  const resolvedIps: string[] = [];
   const resolveType = async (type: string) => {
     const cacheKey = `${hostname}_${type}`;
     let promise = dnsCache.get(cacheKey);
@@ -71,22 +72,29 @@ async function resolveDohRecords(hostname: string, checkIp: (ipStr: string) => v
     for (const record of records) {
       if (record.type === 1 || record.type === 28) {
         checkIp(record.data);
+        if (record.data) {
+          resolvedIps.push(record.data);
+        }
       }
     }
   };
 
   // Check both A and AAAA records
   await Promise.all([resolveType('A'), resolveType('AAAA')]);
+  return resolvedIps;
 }
 
-async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; isLocal: boolean }> {
+async function getNetworkTypeAndIp(hostname: string): Promise<{ isPrivate: boolean; isLocal: boolean; resolvedIp?: string }> {
   if (networkTypeCache.has(hostname)) {
     return { ...networkTypeCache.get(hostname)! };
   }
 
-  const state = { isPrivate: false, isLocal: false };
+  const state: { isPrivate: boolean; isLocal: boolean; resolvedIp?: string } = { isPrivate: false, isLocal: false };
 
-  if (hostname === 'localhost') state.isLocal = true;
+  if (hostname === 'localhost') {
+    state.isLocal = true;
+    state.resolvedIp = '127.0.0.1';
+  }
 
   // Strip brackets for IPv6 parsing
   let ipToParse = hostname;
@@ -94,21 +102,25 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
     ipToParse = ipToParse.slice(1, -1);
   }
 
-  // Skip DoH resolution in tests to prevent hanging/failing tests unless specifically testing validation
-  const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
-  if (proc && proc.env && proc.env.NODE_ENV === 'test' && !proc.env.TEST_VALIDATE_ENDPOINT) {
-    networkTypeCache.set(hostname, state);
-    return { ...state };
-  }
-
   const checkIp = (ipStr: string) => checkIpStatus(ipStr, state);
 
   if (ipaddr.isValid(ipToParse)) {
     checkIp(ipToParse);
+    state.resolvedIp = ipToParse;
   } else if (hostname !== 'localhost') {
+    // Skip DoH resolution in tests to prevent hanging/failing tests unless specifically testing validation
+    const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
+    if (proc && proc.env && proc.env.NODE_ENV === 'test' && !proc.env.TEST_VALIDATE_ENDPOINT) {
+      networkTypeCache.set(hostname, state);
+      return { ...state };
+    }
+
     // If it's a hostname, perform DNS resolution via DoH to check all underlying IPs
     try {
-      await resolveDohRecords(hostname, checkIp);
+      const resolvedIps = await resolveDohRecords(hostname, checkIp);
+      if (resolvedIps.length > 0) {
+        state.resolvedIp = resolvedIps[0];
+      }
     } catch (e) {
       console.warn('DNS over HTTPS resolution failed', e);
     }
@@ -118,12 +130,17 @@ async function getNetworkType(hostname: string): Promise<{ isPrivate: boolean; i
   return { ...state };
 }
 
+export interface ValidatedEndpoint {
+  pinnedEndpoint: string;
+  hostHeader: string;
+}
+
 export interface LLMResponse {
   text: string;
   tokensUsed: number;
 }
 
-export async function validateEndpointUrl(endpoint: string): Promise<void> {
+export async function validateEndpointUrl(endpoint: string): Promise<ValidatedEndpoint> {
   let url: URL;
   try {
     url = new URL(endpoint);
@@ -146,7 +163,7 @@ export async function validateEndpointUrl(endpoint: string): Promise<void> {
     hostname = hostname.slice(0, -1);
   }
 
-  const { isPrivate, isLocal } = await getNetworkType(hostname);
+  const { isPrivate, isLocal, resolvedIp } = await getNetworkTypeAndIp(hostname);
 
   // Disallow explicit metadata/private IPs
   if (isPrivate || hostname === '169.254.169.254') {
@@ -160,6 +177,18 @@ export async function validateEndpointUrl(endpoint: string): Promise<void> {
       throw new Error(`Localhost endpoints are restricted to specific ports (e.g., 11434).`);
     }
   }
+
+  const hostHeader = url.host;
+
+  if (resolvedIp && ipaddr.isValid(resolvedIp)) {
+    const formattedIp = resolvedIp.includes(':') && !resolvedIp.startsWith('[') ? `[${resolvedIp}]` : resolvedIp;
+    url.hostname = formattedIp;
+  }
+
+  return {
+    pinnedEndpoint: url.toString(),
+    hostHeader,
+  };
 }
 
 export async function callLLM(
@@ -188,14 +217,15 @@ export async function callLLM(
       ? 'https://api.openai.com/v1/chat/completions' 
       : 'http://localhost:11434/api/generate');
 
-  await validateEndpointUrl(endpoint);
+  const { pinnedEndpoint, hostHeader } = await validateEndpointUrl(endpoint);
 
   if (provider === 'openai') {
-    const response = await fetch(endpoint, {
+    const response = await fetch(pinnedEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${options.apiKey || ''}`,
+        'Host': hostHeader,
       },
       body: JSON.stringify({
         model: model || 'gpt-4o-mini',
@@ -218,10 +248,11 @@ export async function callLLM(
     return { text, tokensUsed };
   } else {
     // Ollama
-    const response = await fetch(endpoint, {
+    const response = await fetch(pinnedEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Host': hostHeader,
       },
       body: JSON.stringify({
         model: model || 'llama3',
