@@ -184,6 +184,33 @@ describe('callLLM', () => {
     vi.unstubAllGlobals();
   });
 
+  it('should pin resolved IP and preserve Host header in fetch calls', async () => {
+    const mockFetch = vi.fn().mockImplementation(async (url) => {
+      const urlStr = url.toString();
+      if (urlStr.includes('cloudflare-dns')) {
+        return { ok: true, json: async () => ({ Answer: [{ type: 1, data: '93.184.216.34' }] }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: 'Pinned response' } }], usage: { total_tokens: 10 } }),
+      };
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const result = await callLLM('openai', 'gpt-4o', 'Hi', {
+      endpointUrl: 'https://api.openai.com/v1/chat/completions',
+      apiKey: 'key-123',
+    });
+
+    expect(result.text).toBe('Pinned response');
+    const targetCall = mockFetch.mock.calls.find((call) => call[0].toString().includes('/v1/chat/completions'));
+    expect(targetCall).toBeDefined();
+    expect(targetCall[0].toString()).toBe('https://93.184.216.34/v1/chat/completions');
+    expect(targetCall[1].headers.Host).toBe('api.openai.com');
+
+    vi.unstubAllGlobals();
+  });
+
   it('should successfully return parsed response and default empty fallbacks for OpenAI', async () => {
     // Test normal response
     let mockFetch = vi.fn().mockResolvedValue({
