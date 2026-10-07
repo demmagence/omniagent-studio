@@ -29,7 +29,8 @@
     "vitest": "^3.2.7"
   },
   "overrides": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "browserslist": "^4.29.3"
   },
   "dependencies": {
     "ipaddr.js": "^2.4.0"
