@@ -30,7 +30,8 @@
   },
   "overrides": {
     "esbuild": "^0.28.1",
-    "browserslist": "^4.29.3"
+    "browserslist": "^4.29.3",
+    "tinypool": "^2.2.0"
   },
   "dependencies": {
     "ipaddr.js": "^2.4.0"
